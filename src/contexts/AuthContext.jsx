@@ -3,7 +3,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
   signOut,
@@ -25,6 +26,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Handle redirect result from Google/Apple sign-in
+    getRedirectResult(auth).catch(() => {
+      // Ignore errors from redirect (e.g. user cancelled)
+    })
+
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Ensure user doc exists in Firestore
@@ -65,16 +71,14 @@ export function AuthProvider({ children }) {
 
   async function loginWithGoogle() {
     const provider = new GoogleAuthProvider()
-    const cred = await signInWithPopup(auth, provider)
-    return cred.user
+    await signInWithRedirect(auth, provider)
   }
 
   async function loginWithApple() {
     const provider = new OAuthProvider('apple.com')
     provider.addScope('email')
     provider.addScope('name')
-    const cred = await signInWithPopup(auth, provider)
-    return cred.user
+    await signInWithRedirect(auth, provider)
   }
 
   async function logout() {
