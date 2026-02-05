@@ -34,7 +34,6 @@ export default function LoginPage() {
     setError('')
     try {
       await loginWithGoogle()
-      navigate('/')
     } catch (err) {
       setError(err.message.replace('Firebase: ', ''))
     }
@@ -44,7 +43,6 @@ export default function LoginPage() {
     setError('')
     try {
       await loginWithApple()
-      navigate('/')
     } catch (err) {
       setError(err.message.replace('Firebase: ', ''))
     }
