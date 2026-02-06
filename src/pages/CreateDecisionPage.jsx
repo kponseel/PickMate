@@ -1,0 +1,260 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { db } from '../firebase'
+import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../components/Toast'
+
+export default function CreateDecisionPage() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const toast = useToast()
+
+  const [step, setStep] = useState(1)
+  const [saving, setSaving] = useState(false)
+
+  const [title, setTitle] = useState('')
+  const [category, setCategory] = useState('other')
+  const [options, setOptions] = useState([])
+
+  const [newOption, setNewOption] = useState({
+    title: '',
+    description: '',
+    imageUrl: '',
+    price: '',
+    url: '',
+  })
+
+  const categories = [
+    { id: 'food', icon: '🍕', label: 'Food' },
+    { id: 'movie', icon: '🎬', label: 'Movie' },
+    { id: 'activity', icon: '🎯', label: 'Activity' },
+    { id: 'travel', icon: '✈️', label: 'Travel' },
+    { id: 'shopping', icon: '🛍️', label: 'Shopping' },
+    { id: 'other', icon: '💡', label: 'Other' },
+  ]
+
+  const addOption = () => {
+    if (!newOption.title.trim()) {
+      toast.error('Option title is required')
+      return
+    }
+    setOptions([...options, { ...newOption, id: Date.now() }])
+    setNewOption({ title: '', description: '', imageUrl: '', price: '', url: '' })
+    toast.success('Option added')
+  }
+
+  const removeOption = (id) => {
+    setOptions(options.filter((o) => o.id !== id))
+  }
+
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      toast.error('Decision title is required')
+      return
+    }
+    if (options.length < 2) {
+      toast.error('Add at least 2 options')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const decisionRef = await addDoc(collection(db, 'decisions'), {
+        title: title.trim(),
+        category,
+        ownerId: user.uid,
+        status: 'active',
+        createdAt: serverTimestamp(),
+      })
+
+      // Add options as subcollection
+      for (let i = 0; i < options.length; i++) {
+        const opt = options[i]
+        await addDoc(collection(db, 'decisions', decisionRef.id, 'options'), {
+          title: opt.title,
+          description: opt.description || '',
+          imageUrl: opt.imageUrl || '',
+          price: opt.price || '',
+          url: opt.url || '',
+          order: i,
+        })
+      }
+
+      toast.success('Decision created!')
+      navigate(`/decision/${decisionRef.id}`)
+    } catch (error) {
+      console.error('Error creating decision:', error)
+      toast.error('Failed to create decision')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="glass-rose sticky top-0 z-10 px-4 py-3 flex items-center gap-3">
+        <button
+          onClick={() => step === 1 ? navigate(-1) : setStep(1)}
+          className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/50 transition-colors"
+        >
+          <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900">
+          {step === 1 ? 'New Decision' : 'Add Options'}
+        </h1>
+      </div>
+
+      <div className="p-4 pb-32">
+        {step === 1 ? (
+          <div className="space-y-6 animate-fade-in">
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                What are you deciding?
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Where should we eat tonight?"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+              />
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      category === cat.id
+                        ? 'border-rose-500 bg-rose-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{cat.icon}</div>
+                    <div className="text-xs font-medium text-gray-700">{cat.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => title.trim() ? setStep(2) : toast.error('Enter a title first')}
+              className="btn-primary w-full"
+            >
+              Continue
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6 animate-fade-in">
+            {/* Options list */}
+            {options.length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Options ({options.length})
+                </label>
+                {options.map((opt, i) => (
+                  <div key={opt.id} className="card-modern p-3 flex items-center gap-3">
+                    {opt.imageUrl ? (
+                      <img src={opt.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                        {i + 1}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{opt.title}</p>
+                      {opt.price && <p className="text-sm text-rose-600">{opt.price}</p>}
+                    </div>
+                    <button
+                      onClick={() => removeOption(opt.id)}
+                      className="text-gray-400 hover:text-red-500 p-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add new option form */}
+            <div className="card-modern p-4 space-y-4">
+              <h3 className="font-medium text-gray-900">Add Option</h3>
+
+              <input
+                type="text"
+                value={newOption.title}
+                onChange={(e) => setNewOption({ ...newOption, title: e.target.value })}
+                placeholder="Option title *"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+              />
+
+              <input
+                type="text"
+                value={newOption.description}
+                onChange={(e) => setNewOption({ ...newOption, description: e.target.value })}
+                placeholder="Description (optional)"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={newOption.price}
+                  onChange={(e) => setNewOption({ ...newOption, price: e.target.value })}
+                  placeholder="Price (optional)"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+                />
+                <input
+                  type="url"
+                  value={newOption.imageUrl}
+                  onChange={(e) => setNewOption({ ...newOption, imageUrl: e.target.value })}
+                  placeholder="Image URL"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+                />
+              </div>
+
+              <input
+                type="url"
+                value={newOption.url}
+                onChange={(e) => setNewOption({ ...newOption, url: e.target.value })}
+                placeholder="Link URL (optional)"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+              />
+
+              <button onClick={addOption} className="btn-secondary w-full">
+                + Add Option
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom action */}
+      {step === 2 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100">
+          <button
+            onClick={handleSubmit}
+            disabled={saving || options.length < 2}
+            className="btn-primary w-full disabled:opacity-50"
+          >
+            {saving ? 'Creating...' : `Create Decision (${options.length} options)`}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
