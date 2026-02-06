@@ -1,10 +1,8 @@
 import { useAuth } from '../contexts/AuthContext'
-import { useCouple } from '../contexts/CoupleContext'
 import { useNavigate } from 'react-router-dom'
 
 export default function ProfilePage() {
   const { user, logout } = useAuth()
-  const { couple, partner } = useCouple()
   const navigate = useNavigate()
 
   async function handleLogout() {
@@ -30,15 +28,6 @@ export default function ProfilePage() {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-1">{user.displayName || 'User'}</h2>
         <p className="text-gray-500">{user.email}</p>
-
-        {couple && (
-          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-rose-50 rounded-full">
-            <span>{partner ? '💑' : '💕'}</span>
-            <span className="text-sm font-medium text-rose-600">
-              {partner ? `Coupled with ${partner.displayName || 'partner'}` : 'Waiting for partner'}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Account Details */}
@@ -114,7 +103,7 @@ export default function ProfilePage() {
           <span className="font-semibold text-gray-900">PickMate</span>
         </div>
         <p className="text-xs text-gray-400">
-          Version 1.0.0 • Made with ♥ for couples
+          Version 2.0.0 • Create decisions, share links, collect votes
         </p>
       </div>
     </div>

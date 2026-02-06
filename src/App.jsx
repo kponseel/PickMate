@@ -1,12 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { CoupleProvider } from './contexts/CoupleContext'
 import { ToastProvider } from './components/Toast'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
-import DecisionsPage from './pages/DecisionsPage'
+import DashboardPage from './pages/DashboardPage'
+import CreateDecisionPage from './pages/CreateDecisionPage'
 import DecisionDetailPage from './pages/DecisionDetailPage'
-import CouplePage from './pages/CouplePage'
+import VotingPage from './pages/VotingPage'
+import VoteDonePage from './pages/VoteDonePage'
 import ProfilePage from './pages/ProfilePage'
 
 function ProtectedRoute({ children }) {
@@ -38,33 +39,39 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <CoupleProvider>
-          <ToastProvider>
-            <Routes>
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <LoginPage />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <Layout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<DecisionsPage />} />
-                <Route path="decision/:id" element={<DecisionDetailPage />} />
-                <Route path="couple" element={<CouplePage />} />
-                <Route path="profile" element={<ProfilePage />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </ToastProvider>
-        </CoupleProvider>
+        <ToastProvider>
+          <Routes>
+            {/* Public routes */}
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <LoginPage />
+                </PublicRoute>
+              }
+            />
+
+            {/* Voting routes - public, no auth required */}
+            <Route path="/vote/:id" element={<VotingPage />} />
+            <Route path="/vote/:id/done" element={<VoteDonePage />} />
+
+            {/* Protected owner routes */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<DashboardPage />} />
+              <Route path="decision/new" element={<CreateDecisionPage />} />
+              <Route path="decision/:id" element={<DecisionDetailPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )

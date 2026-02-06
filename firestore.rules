@@ -12,13 +12,7 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Check if the current user belongs to a given couple
-    function isCoupleMemb(coupleId) {
-      return isSignedIn() &&
-        request.auth.uid in get(/databases/$(database)/documents/couples/$(coupleId)).data.members;
+      return request.auth != null && request.auth.uid == userId;
     }
 
     // ──────────────────────────────────────────────
@@ -26,80 +20,59 @@ service cloud.firestore {
     // Each user can only read/write their own doc
     // ──────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if false; // users cannot delete their profile doc
-    }
-
-    // ──────────────────────────────────────────────
-    // Couples collection
-    // Only members of the couple can read it.
-    // Any signed-in user can create (to start a couple).
-    // Only members can update (to add second member).
-    // ──────────────────────────────────────────────
-    match /couples/{coupleId} {
-      allow read: if isSignedIn() &&
-        request.auth.uid in resource.data.members;
-
-      allow create: if isSignedIn() &&
-        request.resource.data.members.size() == 1 &&
-        request.auth.uid in request.resource.data.members;
-
-      allow update: if isSignedIn() &&
-        (request.auth.uid in resource.data.members ||
-         // Allow a new member to join via invite code
-         request.resource.data.members.size() == 2);
-
-      allow delete: if isSignedIn() &&
-        request.auth.uid in resource.data.members;
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
     }
 
     // ──────────────────────────────────────────────
     // Decisions collection
-    // Only couple members can CRUD decisions
+    // - Anyone can read (for public voting links)
+    // - Only authenticated users can create
+    // - Only the owner can update/delete
     // ──────────────────────────────────────────────
     match /decisions/{decisionId} {
-      allow read: if isSignedIn() &&
-        isCoupleMemb(resource.data.coupleId);
+      // Public read for shareable voting links
+      allow read: if true;
 
+      // Only authenticated users can create decisions
       allow create: if isSignedIn() &&
-        isCoupleMemb(request.resource.data.coupleId);
+        request.resource.data.ownerId == request.auth.uid;
 
-      allow update: if isSignedIn() &&
-        isCoupleMemb(resource.data.coupleId);
+      // Only owner can update/delete
+      allow update: if isOwner(resource.data.ownerId);
+      allow delete: if isOwner(resource.data.ownerId);
 
-      allow delete: if isSignedIn() &&
-        isCoupleMemb(resource.data.coupleId);
-    }
+      // ──────────────────────────────────────────────
+      // Options subcollection
+      // - Anyone can read (for voting)
+      // - Only owner can write
+      // ──────────────────────────────────────────────
+      match /options/{optionId} {
+        allow read: if true;
 
-    // ──────────────────────────────────────────────
-    // Proposals collection
-    // Access controlled via the parent decision's couple
-    // ──────────────────────────────────────────────
-    match /proposals/{proposalId} {
-      allow read: if isSignedIn();
-      // We validate the decision belongs to user's couple on the client side.
-      // A stricter rule would fetch the decision doc, but that costs reads.
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
+        allow create, update, delete: if isSignedIn() &&
+          get(/databases/$(database)/documents/decisions/$(decisionId)).data.ownerId == request.auth.uid;
+      }
 
-    // ──────────────────────────────────────────────
-    // Ratings collection
-    // Users can only write their own ratings (enforced by doc ID pattern)
-    // ──────────────────────────────────────────────
-    match /ratings/{ratingId} {
-      allow read: if isSignedIn();
+      // ──────────────────────────────────────────────
+      // Voters subcollection
+      // - Anyone can read/create/update (for public voting)
+      // - Voters create their own doc with their ratings
+      // ──────────────────────────────────────────────
+      match /voters/{voterId} {
+        allow read: if true;
+        allow create: if true;
+        allow update: if true;
 
-      allow create, update: if isSignedIn() &&
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.stars >= 1 &&
-        request.resource.data.stars <= 3;
-
-      allow delete: if isSignedIn() &&
-        resource.data.userId == request.auth.uid;
+        // Ratings subcollection within voter doc
+        match /ratings/{optionId} {
+          allow read: if true;
+          allow create: if true;
+          allow update: if true;
+        }
+      }
     }
   }
 }
