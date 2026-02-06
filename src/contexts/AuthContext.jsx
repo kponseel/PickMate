@@ -1,13 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import {
   onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
   signOut,
-  updateProfile,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../firebase'
@@ -32,14 +29,22 @@ export function AuthProvider({ children }) {
     const handleRedirectResult = async () => {
       try {
         const result = await getRedirectResult(auth)
-        if (result?.user && mounted) {
-          console.log('Redirect sign-in successful:', result.user.email)
+        if (result?.user) {
+          console.log('Google sign-in successful:', result.user.email)
         }
       } catch (error) {
-        console.error('Redirect result error:', error)
+        console.error('Redirect error:', error.code, error.message)
         if (mounted) {
-          setAuthError(error.message)
-          setLoading(false)
+          // More user-friendly error messages
+          let message = error.message
+          if (error.code === 'auth/popup-closed-by-user') {
+            message = 'Sign-in was cancelled'
+          } else if (error.code === 'auth/network-request-failed') {
+            message = 'Network error. Please check your connection.'
+          } else if (error.code === 'auth/unauthorized-domain') {
+            message = 'This domain is not authorized for sign-in.'
+          }
+          setAuthError(message)
         }
       }
     }
@@ -49,6 +54,8 @@ export function AuthProvider({ children }) {
     // Listen for auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return
+
+      console.log('Auth state changed:', firebaseUser?.email || 'No user')
 
       if (firebaseUser) {
         try {
@@ -62,15 +69,15 @@ export function AuthProvider({ children }) {
               displayName: firebaseUser.displayName || '',
               createdAt: serverTimestamp(),
             })
+            console.log('Created user doc')
           }
-
-          setUser(firebaseUser)
-          setAuthError(null)
         } catch (error) {
-          console.error('Error setting up user:', error)
-          // Still set the user even if Firestore fails
-          setUser(firebaseUser)
+          // Log but don't block - user can still use the app
+          console.error('Error with user doc:', error)
         }
+
+        setUser(firebaseUser)
+        setAuthError(null)
       } else {
         setUser(null)
       }
@@ -84,49 +91,24 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  async function signup(email, password, displayName) {
-    setAuthError(null)
-    const cred = await createUserWithEmailAndPassword(auth, email, password)
-
-    if (displayName) {
-      await updateProfile(cred.user, { displayName })
-    }
-
-    await setDoc(doc(db, 'users', cred.user.uid), {
-      email,
-      displayName: displayName || '',
-      createdAt: serverTimestamp(),
-    })
-
-    return cred.user
-  }
-
-  async function login(email, password) {
-    setAuthError(null)
-    const cred = await signInWithEmailAndPassword(auth, email, password)
-    return cred.user
-  }
-
   async function loginWithGoogle() {
     setAuthError(null)
     const provider = new GoogleAuthProvider()
     provider.setCustomParameters({
       prompt: 'select_account'
     })
+    // This will redirect the page
     await signInWithRedirect(auth, provider)
   }
 
   async function logout() {
     await signOut(auth)
-    setUser(null)
   }
 
   const value = {
     user,
     loading,
     authError,
-    signup,
-    login,
     loginWithGoogle,
     logout,
     clearError: () => setAuthError(null),
