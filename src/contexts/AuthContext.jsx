@@ -1,14 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import {
   onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   GoogleAuthProvider,
-  OAuthProvider,
   signOut,
-  updateProfile,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
@@ -26,11 +21,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Handle redirect result from Google/Apple sign-in
-    getRedirectResult(auth).catch(() => {
-      // Ignore errors from redirect (e.g. user cancelled)
-    })
-
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Ensure user doc exists in Firestore
@@ -52,40 +42,17 @@ export function AuthProvider({ children }) {
     })
   }, [])
 
-  async function signup(email, password, displayName) {
-    const cred = await createUserWithEmailAndPassword(auth, email, password)
-    await updateProfile(cred.user, { displayName })
-    await setDoc(doc(db, 'users', cred.user.uid), {
-      email,
-      displayName,
-      coupleId: null,
-      createdAt: new Date().toISOString(),
-    })
-    return cred.user
-  }
-
-  async function login(email, password) {
-    const cred = await signInWithEmailAndPassword(auth, email, password)
-    return cred.user
-  }
-
   async function loginWithGoogle() {
     const provider = new GoogleAuthProvider()
-    await signInWithRedirect(auth, provider)
-  }
-
-  async function loginWithApple() {
-    const provider = new OAuthProvider('apple.com')
-    provider.addScope('email')
-    provider.addScope('name')
-    await signInWithRedirect(auth, provider)
+    const result = await signInWithPopup(auth, provider)
+    return result.user
   }
 
   async function logout() {
     await signOut(auth)
   }
 
-  const value = { user, loading, signup, login, loginWithGoogle, loginWithApple, logout }
+  const value = { user, loading, loginWithGoogle, logout }
 
   return (
     <AuthContext.Provider value={value}>
