@@ -10,13 +10,7 @@ export default function ProfilePage() {
     navigate('/login')
   }
 
-  const providerIcons = {
-    'google.com': '🔵',
-    'apple.com': '⚫',
-    password: '📧',
-  }
-
-  const provider = user.providerData?.[0]?.providerId || 'password'
+  const provider = user.providerData?.[0]?.providerId || 'google.com'
   const memberSince = new Date(user.metadata?.creationTime)
 
   return (
@@ -40,7 +34,7 @@ export default function ProfilePage() {
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-lg">
-                {providerIcons[provider] || '📧'}
+                🔵
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">Sign-in method</p>
