@@ -118,6 +118,7 @@ export default function VotingPage() {
   // Touch handlers
   const handleTouchStart = (e) => {
     startX.current = e.touches[0].clientX
+    currentX.current = e.touches[0].clientX
   }
 
   const handleTouchMove = (e) => {
