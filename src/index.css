@@ -248,7 +248,7 @@ html, body {
 
 /* Floating Action Button */
 .fab {
-  @apply fixed bottom-24 right-4 w-14 h-14 bg-rose-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40;
+  @apply fixed bottom-24 right-4 w-14 h-14 bg-rose-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-50;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 4px 20px rgba(225, 29, 72, 0.4);
 }
