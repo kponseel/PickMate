@@ -245,7 +245,7 @@ export default function CreateDecisionPage() {
 
       {/* Bottom action */}
       {step === 2 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100">
+        <div className="fixed bottom-16 left-0 right-0 p-4 bg-white border-t border-gray-100 z-50 safe-bottom">
           <button
             onClick={handleSubmit}
             disabled={saving || options.length < 2}
