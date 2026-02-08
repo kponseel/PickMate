@@ -56,6 +56,12 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-gray-900">My Decisions</h1>
           <p className="text-sm text-gray-500 mt-1">Create and share polls</p>
         </div>
+        <Link to="/decision/new" className="btn-primary flex items-center gap-1.5 text-sm py-2 px-4">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          New
+        </Link>
       </div>
 
       {decisions.length === 0 ? (
@@ -107,16 +113,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* FAB */}
-      <Link
-        to="/decision/new"
-        className="fab"
-        style={{ position: 'fixed', bottom: '5rem', right: '1.5rem' }}
-      >
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      </Link>
     </div>
   )
 }
