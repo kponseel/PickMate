@@ -38,16 +38,16 @@ export default function Layout() {
 
       {/* Modern Bottom Navigation with glass effect */}
       <nav className="fixed bottom-0 left-0 right-0 glass z-40 safe-bottom">
-        <div className="max-w-lg mx-auto flex justify-around py-2 px-4">
+        <div className="max-w-lg mx-auto flex justify-around py-1.5 px-4">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all duration-200 ${
+                `relative flex flex-col items-center gap-0.5 py-2 px-6 rounded-2xl transition-all duration-200 min-h-[48px] justify-center ${
                   isActive
-                    ? 'text-rose-600 bg-rose-50'
+                    ? 'text-rose-600 bg-rose-500/10'
                     : 'text-gray-400 hover:text-gray-600'
                 }`
               }
@@ -57,12 +57,9 @@ export default function Layout() {
                   <span className={`text-xl transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>
                     {isActive ? item.activeIcon : item.icon}
                   </span>
-                  <span className={`text-xs font-medium ${isActive ? 'text-rose-600' : ''}`}>
+                  <span className={`text-[11px] font-medium ${isActive ? 'text-rose-600' : ''}`}>
                     {item.label}
                   </span>
-                  {isActive && (
-                    <span className="absolute -bottom-0 w-1 h-1 bg-rose-600 rounded-full" />
-                  )}
                 </>
               )}
             </NavLink>

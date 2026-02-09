@@ -303,7 +303,7 @@ export default function VotingPage() {
       </div>
 
       {/* Swipe hint */}
-      <p className="text-center text-xs text-gray-400 pb-4">
+      <p className="text-center text-xs text-gray-400 pb-4 safe-bottom">
         Swipe or tap arrows to navigate
       </p>
     </div>

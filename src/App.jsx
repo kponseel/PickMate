@@ -64,10 +64,19 @@ export default function App() {
               }
             >
               <Route index element={<DashboardPage />} />
-              <Route path="decision/new" element={<CreateDecisionPage />} />
               <Route path="decision/:id" element={<DecisionDetailPage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>
+
+            {/* Protected but outside Layout (no bottom nav) */}
+            <Route
+              path="decision/new"
+              element={
+                <ProtectedRoute>
+                  <CreateDecisionPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

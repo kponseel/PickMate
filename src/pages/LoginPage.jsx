@@ -36,7 +36,7 @@ export default function LoginPage() {
           </div>
 
           {/* Glass card */}
-          <div className="glass rounded-3xl p-6 shadow-xl animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <div className="glass rounded-3xl p-8 shadow-xl animate-scale-in" style={{ animationDelay: '0.1s' }}>
             {error && (
               <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-3 rounded-xl animate-shake mb-4">
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -49,7 +49,7 @@ export default function LoginPage() {
             <button
               onClick={handleGoogle}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 py-3.5 px-6 bg-white border-2 border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all font-medium text-gray-700"
+              className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-white border-2 border-gray-200 rounded-2xl hover:border-gray-300 hover:bg-gray-50 transition-all font-medium text-gray-700 shadow-sm min-h-[52px]"
             >
               {loading ? (
                 <span className="flex gap-1">
