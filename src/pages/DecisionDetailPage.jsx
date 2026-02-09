@@ -98,7 +98,15 @@ export default function DecisionDetailPage() {
   const results = getResults()
   const completedVoters = voters.filter((v) => v.completed).length
 
-  const copyLink = async () => {
+  const shareOrCopy = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: decision.title, text: `Vote on "${decision.title}"`, url: shareUrl })
+        return
+      } catch (e) {
+        if (e.name === 'AbortError') return
+      }
+    }
     await navigator.clipboard.writeText(shareUrl)
     setCopied(true)
     toast.success('Link copied!')
@@ -211,14 +219,14 @@ export default function DecisionDetailPage() {
             className="flex-1 px-3 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-600 truncate"
           />
           <button
-            onClick={copyLink}
+            onClick={shareOrCopy}
             className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
               copied
                 ? 'bg-green-500 text-white'
                 : 'bg-rose-500 text-white hover:bg-rose-600'
             }`}
           >
-            {copied ? 'Copied!' : 'Copy'}
+            {copied ? 'Copied!' : navigator.share ? 'Share' : 'Copy'}
           </button>
         </div>
         <p className="text-xs text-gray-400 mt-2">
