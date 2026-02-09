@@ -92,23 +92,26 @@ export default function CreateDecisionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-rose-50 flex flex-col">
       {/* Header */}
-      <div className="glass-rose sticky top-0 z-10 px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={() => step === 1 ? navigate(-1) : setStep(1)}
-          className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/50 transition-colors"
-        >
-          <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <h1 className="text-lg font-semibold text-gray-900">
-          {step === 1 ? 'New Decision' : 'Add Options'}
-        </h1>
-      </div>
+      <header className="glass-rose sticky top-0 z-30 text-white px-5 py-4 safe-top">
+        <div className="max-w-lg mx-auto flex items-center gap-3">
+          <button
+            onClick={() => step === 1 ? navigate(-1) : setStep(1)}
+            className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/20 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-lg font-bold tracking-tight">
+            {step === 1 ? 'New Decision' : 'Add Options'}
+          </h1>
+        </div>
+      </header>
 
-      <div className="p-4 pb-32">
+      {/* Content */}
+      <main className="flex-1 px-4 py-4 max-w-lg mx-auto w-full pb-28">
         {step === 1 ? (
           <div className="space-y-6 animate-fade-in">
             {/* Title */}
@@ -121,7 +124,7 @@ export default function CreateDecisionPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Where should we eat tonight?"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+                className="input-modern"
               />
             </div>
 
@@ -139,7 +142,7 @@ export default function CreateDecisionPage() {
                     className={`p-3 rounded-xl border-2 transition-all ${
                       category === cat.id
                         ? 'border-rose-500 bg-rose-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}
                   >
                     <div className="text-2xl mb-1">{cat.icon}</div>
@@ -199,7 +202,7 @@ export default function CreateDecisionPage() {
                 value={newOption.title}
                 onChange={(e) => setNewOption({ ...newOption, title: e.target.value })}
                 placeholder="Option title *"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+                className="input-modern"
               />
 
               <input
@@ -207,7 +210,7 @@ export default function CreateDecisionPage() {
                 value={newOption.description}
                 onChange={(e) => setNewOption({ ...newOption, description: e.target.value })}
                 placeholder="Description (optional)"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+                className="input-modern"
               />
 
               <div className="grid grid-cols-2 gap-3">
@@ -216,14 +219,14 @@ export default function CreateDecisionPage() {
                   value={newOption.price}
                   onChange={(e) => setNewOption({ ...newOption, price: e.target.value })}
                   placeholder="Price (optional)"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+                  className="input-modern"
                 />
                 <input
                   type="url"
                   value={newOption.imageUrl}
                   onChange={(e) => setNewOption({ ...newOption, imageUrl: e.target.value })}
                   placeholder="Image URL"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+                  className="input-modern"
                 />
               </div>
 
@@ -232,7 +235,7 @@ export default function CreateDecisionPage() {
                 value={newOption.url}
                 onChange={(e) => setNewOption({ ...newOption, url: e.target.value })}
                 placeholder="Link URL (optional)"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 transition-all"
+                className="input-modern"
               />
 
               <button onClick={addOption} className="btn-secondary w-full">
@@ -241,18 +244,20 @@ export default function CreateDecisionPage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
 
-      {/* Bottom action */}
+      {/* Fixed bottom action - only on step 2 */}
       {step === 2 && (
-        <div className="fixed bottom-20 left-0 right-0 p-4 bg-white border-t border-gray-100 z-50">
-          <button
-            onClick={handleSubmit}
-            disabled={saving || options.length < 2}
-            className="btn-primary w-full disabled:opacity-50"
-          >
-            {saving ? 'Creating...' : `Create Decision (${options.length} options)`}
-          </button>
+        <div className="fixed bottom-0 left-0 right-0 glass z-50 safe-bottom">
+          <div className="max-w-lg mx-auto p-4">
+            <button
+              onClick={handleSubmit}
+              disabled={saving || options.length < 2}
+              className="btn-primary w-full disabled:opacity-50"
+            >
+              {saving ? 'Creating...' : `Create Decision (${options.length} options)`}
+            </button>
+          </div>
         </div>
       )}
     </div>
