@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
-import { db } from '../firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '../firebase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/Toast'
+
+const scrapeUrl = httpsCallable(functions, 'scrapeUrl')
 
 export default function CreateDecisionPage() {
   const navigate = useNavigate()
@@ -25,6 +28,40 @@ export default function CreateDecisionPage() {
     url: '',
   })
 
+  const [fetchingMeta, setFetchingMeta] = useState(false)
+  const lastScrapedUrl = useRef('')
+
+  const handleUrlChange = useCallback(async (url) => {
+    setNewOption((prev) => ({ ...prev, url }))
+
+    // Only scrape if it looks like a valid URL
+    if (!url || lastScrapedUrl.current === url) return
+    try {
+      new URL(url)
+    } catch {
+      return
+    }
+
+    lastScrapedUrl.current = url
+    setFetchingMeta(true)
+    try {
+      const result = await scrapeUrl({ url })
+      const meta = result.data
+      setNewOption((prev) => ({
+        ...prev,
+        title: prev.title || meta.title || prev.title,
+        description: prev.description || meta.description || prev.description,
+        imageUrl: prev.imageUrl || meta.image || prev.imageUrl,
+        price: prev.price || meta.price || prev.price,
+      }))
+      if (meta.title) toast.success('Auto-filled from link')
+    } catch (err) {
+      console.warn('Could not scrape URL:', err.message)
+    } finally {
+      setFetchingMeta(false)
+    }
+  }, [toast])
+
   const categories = [
     { id: 'food', icon: '🍕', label: 'Food' },
     { id: 'movie', icon: '🎬', label: 'Movie' },
@@ -41,6 +78,7 @@ export default function CreateDecisionPage() {
     }
     setOptions([...options, { ...newOption, id: Date.now() }])
     setNewOption({ title: '', description: '', imageUrl: '', price: '', url: '' })
+    lastScrapedUrl.current = ''
     toast.success('Option added')
   }
 
@@ -197,6 +235,63 @@ export default function CreateDecisionPage() {
             <div className="card-modern p-4 space-y-4">
               <h3 className="font-medium text-gray-900">Add Option</h3>
 
+              {/* URL field first — paste a link to auto-fill */}
+              <div className="relative">
+                <input
+                  type="url"
+                  value={newOption.url}
+                  onChange={(e) => setNewOption({ ...newOption, url: e.target.value })}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData('text')
+                    if (pasted) setTimeout(() => handleUrlChange(pasted), 0)
+                  }}
+                  onBlur={(e) => handleUrlChange(e.target.value)}
+                  placeholder="Paste a link to auto-fill details"
+                  className="input-modern pr-10"
+                />
+                {fetchingMeta ? (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-0.5">
+                    <span className="w-1.5 h-1.5 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-rose-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                ) : newOption.url && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              {fetchingMeta && (
+                <div className="flex items-center gap-2 text-sm text-rose-500 animate-pulse-soft">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Fetching details from link...
+                </div>
+              )}
+
+              {/* Image preview when auto-filled */}
+              {newOption.imageUrl && (
+                <div className="relative rounded-xl overflow-hidden h-32 bg-gray-100 animate-fade-in">
+                  <img
+                    src={newOption.imageUrl}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.target.style.display = 'none' }}
+                  />
+                  <button
+                    onClick={() => setNewOption({ ...newOption, imageUrl: '' })}
+                    className="absolute top-2 right-2 w-7 h-7 bg-black/50 text-white rounded-full flex items-center justify-center text-xs"
+                  >
+                    x
+                  </button>
+                </div>
+              )}
+
               <input
                 type="text"
                 value={newOption.title}
@@ -229,14 +324,6 @@ export default function CreateDecisionPage() {
                   className="input-modern"
                 />
               </div>
-
-              <input
-                type="url"
-                value={newOption.url}
-                onChange={(e) => setNewOption({ ...newOption, url: e.target.value })}
-                placeholder="Link URL (optional)"
-                className="input-modern"
-              />
 
               <button onClick={addOption} className="btn-secondary w-full">
                 + Add Option

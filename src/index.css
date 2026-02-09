@@ -140,6 +140,10 @@ html, body {
   animation: shake 0.5s ease-in-out;
 }
 
+.animate-pulse-soft {
+  animation: pulse-soft 1.5s ease-in-out infinite;
+}
+
 /* Staggered animations for lists */
 .stagger-1 { animation-delay: 0.05s; }
 .stagger-2 { animation-delay: 0.1s; }
