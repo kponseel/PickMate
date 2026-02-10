@@ -19,6 +19,15 @@ function getMetaContent(html, property) {
   return ''
 }
 
+function checkImageSize(src, minSize = 100) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(img.naturalWidth >= minSize && img.naturalHeight >= minSize)
+    img.onerror = () => resolve(false)
+    img.src = src
+  })
+}
+
 async function fetchLinkMeta(url) {
   // Try multiple CORS proxies for reliability
   const proxies = [
@@ -57,6 +66,11 @@ async function fetchLinkMeta(url) {
 
   if (image && !image.startsWith('http')) {
     try { image = new URL(image, new URL(url).origin).href } catch { /* ignore */ }
+  }
+
+  // Drop tiny images (favicons, tracking pixels, etc.)
+  if (image && !(await checkImageSize(image))) {
+    image = ''
   }
 
   const price =
