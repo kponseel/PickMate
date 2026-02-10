@@ -1,12 +1,70 @@
 import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
-import { httpsCallable } from 'firebase/functions'
-import { db, functions } from '../firebase'
+import { db } from '../firebase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/Toast'
 
-const scrapeUrl = httpsCallable(functions, 'scrapeUrl')
+function getMetaContent(html, property) {
+  const patterns = [
+    new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']*)["']`, 'i'),
+    new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*property=["']${property}["']`, 'i'),
+    new RegExp(`<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']*)["']`, 'i'),
+    new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*name=["']${property}["']`, 'i'),
+  ]
+  for (const p of patterns) {
+    const m = html.match(p)
+    if (m) return m[1]
+  }
+  return ''
+}
+
+async function fetchLinkMeta(url) {
+  // Try multiple CORS proxies for reliability
+  const proxies = [
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ]
+
+  let html = ''
+  for (const proxy of proxies) {
+    try {
+      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(8000) })
+      if (res.ok) {
+        html = await res.text()
+        break
+      }
+    } catch {
+      continue
+    }
+  }
+
+  if (!html) return null
+
+  const title =
+    getMetaContent(html, 'og:title') ||
+    getMetaContent(html, 'twitter:title') ||
+    (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || ''
+
+  const description =
+    getMetaContent(html, 'og:description') ||
+    getMetaContent(html, 'twitter:description') ||
+    getMetaContent(html, 'description') || ''
+
+  let image =
+    getMetaContent(html, 'og:image') ||
+    getMetaContent(html, 'twitter:image') || ''
+
+  if (image && !image.startsWith('http')) {
+    try { image = new URL(image, new URL(url).origin).href } catch { /* ignore */ }
+  }
+
+  const price =
+    getMetaContent(html, 'product:price:amount') ||
+    getMetaContent(html, 'og:price:amount') || ''
+
+  return { title: title.trim(), description: description.trim(), image, price: price.trim() }
+}
 
 export default function CreateDecisionPage() {
   const navigate = useNavigate()
@@ -45,16 +103,17 @@ export default function CreateDecisionPage() {
     lastScrapedUrl.current = url
     setFetchingMeta(true)
     try {
-      const result = await scrapeUrl({ url })
-      const meta = result.data
-      setNewOption((prev) => ({
-        ...prev,
-        title: prev.title || meta.title || prev.title,
-        description: prev.description || meta.description || prev.description,
-        imageUrl: prev.imageUrl || meta.image || prev.imageUrl,
-        price: prev.price || meta.price || prev.price,
-      }))
-      if (meta.title) toast.success('Auto-filled from link')
+      const meta = await fetchLinkMeta(url)
+      if (meta) {
+        setNewOption((prev) => ({
+          ...prev,
+          title: prev.title || meta.title || '',
+          description: prev.description || meta.description || '',
+          imageUrl: prev.imageUrl || meta.image || '',
+          price: prev.price || meta.price || '',
+        }))
+        if (meta.title) toast.success('Auto-filled from link')
+      }
     } catch (err) {
       console.warn('Could not scrape URL:', err.message)
     } finally {
