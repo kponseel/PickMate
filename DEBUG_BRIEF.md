@@ -1,7 +1,9 @@
 # DEBUG BRIEF — Flipper-Quiz (ESP32-S2 + Flipper Zero)
 
-> Document auto-suffisant à coller dans une IA de debug. Il contient tout le
-> contexte, les protocoles, et le CODE SOURCE COMPLET des deux programmes.
+> Document auto-suffisant. Contexte, protocoles, diagnostic + corrections
+> appliquées, et CODE SOURCE COMPLET (à jour) des deux programmes.
+>
+> STATUT : ✅ Cause racine identifiée et CORRIGÉE (voir « Corrections appliquées »).
 
 ## Objectif du projet
 Quiz multijoueur **local et hors-ligne**. La Wi-Fi Developer Board (ESP32-S2) du
@@ -9,13 +11,27 @@ Flipper crée un point d'accès Wi-Fi ouvert "Flipper-Quiz", sert une page web a
 smartphones (portail captif + WebSocket) et gère toute la logique du jeu. Le
 Flipper Zero sert de pupitre au maître du jeu et dialogue avec l'ESP32 en UART.
 
-## ⚠️ SYMPTÔME OBSERVÉ (À REMPLIR avant de demander de l'aide)
-- Ce qui ne marche pas, précisément : .........................................
-- Message(s) d'erreur exact(s) : ..............................................
-- Étape qui échoue (entoure) : build ESP32 / upload ESP32 / `ufbt` build /
-  app Flipper plante / app Flipper figée sur "Joueurs: 0" / la page ne s'ouvre
-  pas sur le téléphone / pas de port COM / autre : ............................
-- Ce qui marche déjà : ........................................................
+## ✅ Corrections appliquées
+**1. Broches UART de l'ESP32 (cause racine du "Joueurs: 0" figé).**
+Sur la Wi-Fi Developer Board officielle, l'USART du Flipper (broche 13 = TX,
+broche 14 = RX) est câblé sur l'**UART0 matériel de l'ESP32-S2** (TX0 = GPIO43,
+RX0 = GPIO44). Le firmware utilisait des broches placeholder (GPIO 18/17) →
+aucune communication. Corrigé dans `esp32-quiz/src/main.cpp` :
+```
+#define FLIPPER_UART_RX_PIN 44  // <- Flipper pin 13 (TX)
+#define FLIPPER_UART_TX_PIN 43  // -> Flipper pin 14 (RX)
+```
+`FlipperSerial` (UART1) est routé sur ces broches via la matrice GPIO, sans
+conflit avec l'USB-CDC. Penser au croisement TX<->RX.
+
+**2. Côté Flipper : aucun changement nécessaire.** `furi_hal_serial_control_acquire(FuriHalSerialIdUsart)`
+cible déjà les broches 13/14 (correct pour OFW 1.4.3). Rappel : fermer qFlipper /
+tout terminal série avant de lancer l'app, sinon l'USART est verrouillé et
+`furi_check(app->serial)` fait planter l'app.
+
+**3. Bug d'affichage corrigé.** Au retour en `lobby`/`finished`, l'ESP32 n'envoie
+pas de ligne `Q:`, donc l'ancien numéro de question restait affiché. `parse_line`
+vide maintenant `qinfo` quand l'état passe à `lobby` ou `finished`.
 
 ## Matériel & versions
 - Flipper Zero, firmware **OFW 1.4.3** (build 5 déc 2025), radio 1.20.0 LITE.
@@ -36,7 +52,12 @@ Flipper Zero sert de pupitre au maître du jeu et dialogue avec l'ESP32 en UART.
 - Flipper = pupitre (affiche l'état reçu en UART, envoie NEXT/RESET en UART).
 - Flipper et ESP32 sont DEUX programmes indépendants reliés par un câble série.
 
-## Protocole UART (Flipper <-> ESP32) — 115200 bauds, 8N1, lignes ASCII '\n'
+## Mapping UART confirmé (board officielle)
+- Flipper **pin 13 (TX)** -> **ESP32-S2 RX0 = GPIO44**
+- Flipper **pin 14 (RX)** -> **ESP32-S2 TX0 = GPIO43**
+- 115200 bauds, 8N1.
+
+## Protocole UART (Flipper <-> ESP32) — lignes ASCII terminées par '\n'
 ESP32 -> Flipper :
 - `PLAYERS:<n>`  (nb de joueurs connectés)
 - `STATE:<s>`    (lobby | question | reveal | finished)
@@ -56,46 +77,24 @@ Serveur -> client :
 - {"type":"reveal","correct":i,"scores":[{"name":"...","score":N},...]}
 - {"type":"finished","scores":[...]}
 
-## Hypothèses & points de panne probables (ordre de priorité)
-1. **BROCHES UART CÔTÉ ESP32 = SUSPECT N°1.** Le firmware utilise actuellement
-   UART1 sur **RX=GPIO18 / TX=GPIO17** (valeurs PLACEHOLDER). Or la Wi-Fi board
-   officielle relie le plus souvent l'UART du Flipper (broches 13=TX/14=RX) à
-   l'**UART0 de l'ESP32-S2 (GPIO43=TX0 / GPIO44=RX0)**. Si le Flipper reste figé
-   sur "Joueurs: 0", c'est très probablement ça. -> Confirmer le câblage réel de
-   la board et corriger `FLIPPER_UART_RX_PIN/TX_PIN` (ou passer sur UART0).
-   Vérifier aussi le CROISEMENT TX<->RX.
-2. **API série Flipper** : code en `furi_hal_serial_*` (API moderne, OK pour OFW
-   1.4.3). Sur très vieux firmware ce serait `furi_hal_uart_*`.
-3. **USART du Flipper déjà pris** (CLI/USB/autre app) -> `control_acquire` échoue
-   et `furi_check` ferait crasher l'app. Fermer qFlipper.
-4. **Libs ESP32 tirées par URL git** (ESPAsyncWebServer/AsyncTCP) -> réseau requis
-   au 1er build PlatformIO.
-5. **board PlatformIO** `esp32-s2-saola-1` générique -> peut nécessiter le board
-   exact / réglages flash-size / USB.
-6. **Portail captif** : selon l'OS la page peut ne pas pop -> ouvrir
-   http://192.168.4.1 à la main.
+## Méthode de test par couche
+1. ESP32 SEUL : flasher, `pio device monitor` -> "Flipper-Quiz AP ... up at
+   192.168.4.1". Connecter un téléphone, piloter via `http://192.168.4.1/admin/next`.
+2. UART : à chaque advance, l'ESP32 émet PLAYERS:/STATE:/Q: ; `NEXT\n` fait avancer.
+3. FLIPPER : ouvrir l'app ; le compteur "Joueurs" doit bouger quand un téléphone
+   rejoint -> signe que l'UART passe.
 
-## Méthode de test par couche (pour isoler la panne)
-1. ESP32 SEUL (sans Flipper) : flasher, `pio device monitor` -> doit afficher
-   "Flipper-Quiz AP ... up at 192.168.4.1". Connecter un téléphone, piloter via
-   navigateur `http://192.168.4.1/admin/next`. Si le jeu tourne ainsi => tout le
-   bloc ESP32/Wi-Fi/WS/UI est bon, et la panne est dans l'UART.
-2. UART SEUL : à chaque advance, l'ESP32 doit émettre PLAYERS:/STATE:/Q: ;
-   envoyer `NEXT\n` doit faire avancer la partie.
-3. FLIPPER SEUL : ouvrir l'app Quiz Master ; si elle s'ouvre sans crash, GUI +
-   acquisition USART OK. Si "Etat:" reste "..." quand l'ESP32 émet => point 1 des
-   hypothèses (broches/câblage).
-
-## Question à l'IA de debug
-"Voici tout le contexte et le code source complet ci-dessous. Aide-moi à
-identifier la cause du symptôme décrit plus haut. En particulier : confirme le
-mapping UART correct entre l'ESP32-S2 de la Wi-Fi Developer Board OFFICIELLE du
-Flipper et l'USART du Flipper (broches 13/14), et indique exactement quelles
-lignes corriger dans `esp32-quiz/src/main.cpp` et/ou `apps/quiz_master/quiz_master.c`."
+## Notes / pistes restantes
+- Concurrence : AsyncTCP exécute les callbacks WebSocket dans une tâche distincte
+  de loop(). `players[]`/`gameState` sont partagés ; OK pour un jeu de soirée
+  (garde d'idempotence sur reveal()). Pour du robuste : file d'événements traitée
+  uniquement dans loop().
+- Libs ESP32 (ESPAsyncWebServer/AsyncTCP) tirées par URL git -> réseau requis au
+  1er build.
 
 ---
 
-# CODE SOURCE COMPLET
+# CODE SOURCE COMPLET (à jour)
 
 ## esp32-quiz/platformio.ini
 ```ini
@@ -149,10 +148,11 @@ static const IPAddress AP_GATEWAY(192, 168, 4, 1);
 static const IPAddress AP_SUBNET(255, 255, 255, 0);
 static const byte DNS_PORT = 53;
 
-// UART link to the Flipper Zero. These pins MUST match how the ESP32 is wired
-// to the Flipper's GPIO header on your board; adjust if needed.
-#define FLIPPER_UART_RX_PIN 18
-#define FLIPPER_UART_TX_PIN 17
+// UART link to the Flipper Zero. On the official Wi-Fi Dev Board the Flipper's
+// USART (pin 13 TX / pin 14 RX) is wired to the ESP32-S2 UART0 pins; we route
+// FlipperSerial (UART1) onto them via the GPIO matrix.
+#define FLIPPER_UART_RX_PIN 44  // <- Flipper pin 13 (TX)
+#define FLIPPER_UART_TX_PIN 43  // -> Flipper pin 14 (RX)
 #define FLIPPER_UART_BAUD   115200
 
 #define MAX_PLAYERS        16
@@ -716,6 +716,10 @@ static void parse_line(QuizApp* app, const char* line) {
     } else if(strncmp(line, "STATE:", 6) == 0) {
         strncpy(app->quiz.state, line + 6, sizeof(app->quiz.state) - 1);
         app->quiz.state[sizeof(app->quiz.state) - 1] = '\0';
+        // Back to lobby / end of game: clear stale question info from the screen
+        if(strcmp(app->quiz.state, "lobby") == 0 || strcmp(app->quiz.state, "finished") == 0) {
+            app->quiz.qinfo[0] = '\0';
+        }
     } else if(strncmp(line, "Q:", 2) == 0) {
         strncpy(app->quiz.qinfo, line + 2, sizeof(app->quiz.qinfo) - 1);
         app->quiz.qinfo[sizeof(app->quiz.qinfo) - 1] = '\0';
