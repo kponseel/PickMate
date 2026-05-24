@@ -326,6 +326,7 @@ static void startQuestion(int idx) {
 }
 
 static void reveal() {
+    if (gameState != QUESTION) return;  // idempotent: timeout vs all-answered can both fire
     uint8_t correct = QUESTIONS[currentQuestion].correct;
     for (int i = 0; i < MAX_PLAYERS; i++) {
         Player& p = players[i];
@@ -465,7 +466,7 @@ static void setupServer() {
     server.addHandler(&ws);
 
     server.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send_P(200, "text/html", INDEX_HTML);
+        req->send(200, "text/html", INDEX_HTML);
     });
 
     // Browser-based game-master controls (works without the Flipper)
