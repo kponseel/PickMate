@@ -1,0 +1,11 @@
+App(
+    appid="hello_world",
+    name="Hello World",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="hello_world_app",
+    stack_size=2 * 1024,
+    fap_category="Examples",
+    fap_author="kponseel",
+    fap_version="1.0",
+    fap_description="Minimal Hello World app for Flipper Zero",
+)

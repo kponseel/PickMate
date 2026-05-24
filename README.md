@@ -1,238 +1,74 @@
-# PickMate
+# Flipper Zero Apps
 
-A mobile-first PWA for couples to make decisions together — propose options, rate them, and pick a winner.
+Dépôt de développement d'applications externes (`.fap`) pour le **Flipper Zero**, écrites en C avec l'outil [`ufbt`](https://github.com/flipperdevices/flipperzero-ufbt) (micro Flipper Build Tool).
 
-## Architecture Overview
+## Prérequis
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    PWA Shell                         │
-│  (installable, offline-capable, portrait-oriented)   │
-├─────────────────────────────────────────────────────┤
-│            React SPA (Vite + React Router)           │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
-│  │  Login   │ │Decisions │ │  Couple  │ │Profile │ │
-│  │  Page    │ │  Page    │ │  Page    │ │ Page   │ │
-│  └──────────┘ └──────────┘ └──────────┘ └────────┘ │
-│            ↕ Context Providers (Auth, Couple)        │
-│            ↕ Custom Hooks (decisions, proposals,     │
-│              ratings) — real-time Firestore listeners │
-├─────────────────────────────────────────────────────┤
-│               Firebase Backend                       │
-│  ┌────────────┐ ┌────────────┐ ┌─────────────────┐ │
-│  │    Auth    │ │ Firestore  │ │    Hosting      │ │
-│  │ Email,    │ │ Real-time  │ │ CDN + SSL       │ │
-│  │ Google,   │ │ Database   │ │ SPA rewrites    │ │
-│  │ Apple     │ │            │ │                 │ │
-│  └────────────┘ └────────────┘ └─────────────────┘ │
-└─────────────────────────────────────────────────────┘
-```
+- Un **Flipper Zero** (idéalement avec un firmware à jour).
+- **Python 3.8+** installé.
+- Installer `ufbt` :
 
-### Why this stack?
+  ```bash
+  python3 -m pip install --upgrade ufbt
+  ```
 
-| Choice | Rationale |
-|--------|-----------|
-| **React + Vite** | Fast builds, large ecosystem, simple mental model |
-| **Tailwind CSS** | Utility-first — no separate CSS files, consistent design |
-| **Firebase Auth** | Zero-backend auth with email, Google, and Apple sign-in |
-| **Firestore** | Real-time sync between both partners, zero server code |
-| **Firebase Hosting** | Free tier, global CDN, automatic SSL, SPA support |
-| **vite-plugin-pwa** | Auto-generates service worker and manifest for installability |
+- Au premier lancement, `ufbt` télécharge le SDK correspondant à ton firmware :
 
-## Firestore Data Model
+  ```bash
+  ufbt update
+  ```
+
+## Structure du dépôt
 
 ```
-users/{userId}
-  ├── email: string
-  ├── displayName: string
-  ├── coupleId: string | null
-  └── createdAt: ISO string
-
-couples/{coupleId}
-  ├── members: string[]          (1-2 user IDs)
-  ├── inviteCode: string         (6-char uppercase code)
-  ├── createdBy: string
-  └── createdAt: ISO string
-
-decisions/{decisionId}
-  ├── coupleId: string           (FK to couples)
-  ├── title: string
-  ├── category: string           (travel|food|shopping|activity|movie|other)
-  ├── status: string             (open|closed|archived)
-  └── createdAt: ISO string
-
-proposals/{proposalId}
-  ├── decisionId: string         (FK to decisions)
-  ├── title: string
-  ├── description: string
-  ├── url: string                (external link)
-  ├── imageUrl: string
-  ├── price: string
-  └── createdAt: ISO string
-
-ratings/{decisionId_proposalId_userId}
-  ├── decisionId: string
-  ├── proposalId: string
-  ├── userId: string
-  ├── stars: number              (1, 2, or 3)
-  └── updatedAt: ISO string
+.
+├── apps/
+│   └── hello_world/          # App d'exemple minimale (GUI)
+│       ├── application.fam   # Manifeste de l'app
+│       └── hello_world.c     # Point d'entrée + logique
+└── README.md
 ```
 
-### Key design decisions:
+Chaque application vit dans son propre dossier sous `apps/` et contient au minimum un manifeste `application.fam` et un fichier source C.
 
-- **Flat collections** (not subcollections) — simpler queries and security rules
-- **Deterministic rating IDs** (`decision_proposal_user`) — enforces one vote per user per proposal without needing a unique constraint
-- **Invite codes** — 6-char random codes for couple pairing; no complex link/email invitation needed for MVP
-- **ISO date strings** — portable, human-readable, sortable
+## Compiler & déployer une app
 
-## Business Logic
-
-### Rating system
-- Each user rates each proposal from 1 to 3 stars
-- One rating per user per proposal (upserted via deterministic doc ID)
-- Results ranked by total stars (sum), with average shown
-
-### Decision lifecycle
-```
-  open → closed → archived
-    ↑       │
-    └───────┘  (can reopen)
-```
-- **Open**: proposals can be added/removed, ratings can be changed
-- **Closed**: voting locked, results are final
-- **Archived**: hidden from main view (future enhancement)
-
-### Permissions
-- Only couple members can see their decisions
-- Either partner can create/rate/close decisions
-- Leaving a couple cleans up the association
-
-## Frontend Structure
-
-```
-src/
-├── main.jsx                 # Entry point
-├── App.jsx                  # Router + providers
-├── index.css                # Tailwind imports + theme
-├── firebase.js              # Firebase initialization
-├── contexts/
-│   ├── AuthContext.jsx       # Auth state + methods
-│   └── CoupleContext.jsx     # Couple state + methods
-├── hooks/
-│   ├── useDecisions.js       # CRUD + real-time decisions
-│   ├── useProposals.js       # CRUD + real-time proposals
-│   └── useRatings.js         # Rating + result calculation
-├── components/
-│   ├── Layout.jsx            # Shell with header + bottom nav
-│   ├── StarRating.jsx        # 1-3 star input/display
-│   ├── ProposalCard.jsx      # Proposal with rating
-│   └── ResultsView.jsx       # Ranked results display
-└── pages/
-    ├── LoginPage.jsx         # Auth (email/Google/Apple)
-    ├── DecisionsPage.jsx     # Decision list + creation
-    ├── DecisionDetailPage.jsx # Proposals + ratings + results
-    ├── CouplePage.jsx        # Create/join/manage couple
-    └── ProfilePage.jsx       # User info + logout
-```
-
-## State Management Strategy
-
-No external state library needed. The app uses:
-
-1. **React Context** for global state (auth user, couple info)
-2. **Custom hooks with Firestore `onSnapshot`** for real-time data (decisions, proposals, ratings)
-3. **Local component state** for UI interactions (forms, tabs)
-
-Data flows: Firebase → `onSnapshot` listeners → React state → UI. Writes go directly to Firestore, and the snapshot listeners automatically update the UI.
-
-## Security Rules
-
-See `firestore.rules` for the complete ruleset. Key principles:
-
-- Users can only read/write their own user document
-- Couple documents are readable only by their members
-- Decisions are scoped to the couple that created them
-- Ratings enforce `stars` between 1-3 and `userId` matches the authenticated user
-- No user can delete their profile document (data retention)
-
-## Firebase Deployment Guide
-
-### Step 1: Create a Firebase project
-
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Click **Add project**, name it (e.g., `pickmate`)
-3. Disable Google Analytics (not needed for MVP)
-4. Click **Create project**
-
-### Step 2: Enable Authentication
-
-1. In Firebase Console, go to **Authentication > Sign-in method**
-2. Enable **Email/Password**
-3. Enable **Google** (select a support email)
-4. (Optional) Enable **Apple** — requires an Apple Developer account
-
-### Step 3: Create Firestore Database
-
-1. Go to **Firestore Database > Create database**
-2. Select **Start in production mode**
-3. Choose a region close to your users (e.g., `europe-west1` for EU/GDPR)
-4. After creation, go to **Rules** tab and paste the contents of `firestore.rules`
-
-### Step 4: Register your web app
-
-1. Go to **Project Settings > General**
-2. Under "Your apps", click the web icon (`</>`)
-3. Register app name: `PickMate`
-4. Copy the `firebaseConfig` values
-
-### Step 5: Configure environment
+Depuis le dossier de l'app (par ex. `apps/hello_world`) :
 
 ```bash
-cp .env.example .env
-# Edit .env with your Firebase config values from Step 4
+cd apps/hello_world
+
+# Compiler le .fap
+ufbt
+
+# Compiler puis l'installer sur le Flipper connecté en USB et la lancer
+ufbt launch
 ```
 
-### Step 6: Install Firebase CLI and deploy
+Le `.fap` généré se trouve dans `dist/`. Tu peux aussi le copier manuellement dans `apps/<catégorie>/` sur la carte SD du Flipper.
+
+Commandes utiles :
 
 ```bash
-# Install Firebase CLI globally
-npm install -g firebase-tools
-
-# Login to Firebase
-firebase login
-
-# Initialize (select Hosting and Firestore when prompted)
-firebase init
-
-# Build the app
-npm run build
-
-# Deploy
-firebase deploy
+ufbt cli      # ouvre la CLI du Flipper
+ufbt flash    # flashe le firmware (DFU)
+ufbt vscode_setup   # génère la config VS Code (IntelliSense, build, debug)
 ```
 
-### Step 7: Set up GDPR-compliant data location
+## Ajouter une nouvelle app
 
-Firestore region should be `europe-west1` (Belgium) or another EU region. Firebase Auth data processing follows Google's [Data Processing Terms](https://firebase.google.com/terms/data-processing-terms).
+1. Crée un dossier `apps/<nom_app>/`.
+2. Ajoute un `application.fam` (voir l'exemple `hello_world`).
+3. Implémente le point d'entrée déclaré dans `entry_point`.
+4. `cd apps/<nom_app> && ufbt launch`.
 
-## Local Development
+## Références
 
-```bash
-# Install dependencies
-npm install
+- Documentation Flipper Zero : https://docs.flipper.net/
+- Référence du firmware / API C : https://developer.flipper.net/
+- `ufbt` : https://github.com/flipperdevices/flipperzero-ufbt
+- Exemples officiels d'apps : https://github.com/flipperdevices/flipperzero-firmware/tree/dev/applications/examples
 
-# Copy environment file and add your Firebase config
-cp .env.example .env
+## Note
 
-# Start dev server
-npm run dev
-```
-
-The app runs at `http://localhost:5173`.
-
-## PWA Installation
-
-- **Android**: Open in Chrome → tap "Add to Home Screen" in the browser menu
-- **iOS**: Open in Safari → tap Share → "Add to Home Screen"
-
-The app works offline for cached pages and syncs when connectivity returns (Firestore handles this automatically).
+Les capacités sub-GHz, RFID/NFC, infrarouge et Wi-Fi (via la dev board ESP32) sont soumises à la réglementation locale. N'utilise ces fonctions que sur tes propres équipements/réseaux ou dans un cadre explicitement autorisé.
