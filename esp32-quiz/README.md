@@ -48,7 +48,8 @@ Si ta carte n'est pas une ESP32-S2 Saola générique, ajuste `board` dans
    s'ouvre seule (sinon, aller sur `http://192.168.4.1`).
 3. Chaque joueur saisit un pseudo.
 4. Le maître lance et fait avancer la partie :
-   - via le Flipper (bouton OK) — voir l'app `.fap` (à venir), ou
+   - via le Flipper (bouton **OK** = suivant, **Bas** = reset) — app
+     [`apps/quiz_master`](../apps/quiz_master/), ou
    - via un navigateur : `http://192.168.4.1/admin/next` (démarrer / question
      suivante / révéler) et `/admin/reset` (recommencer).
 

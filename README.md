@@ -6,8 +6,10 @@ Dépôt de développement pour le **Flipper Zero** et sa **Wi-Fi Developer Board
 
 | Dossier        | Description |
 |----------------|-------------|
-| [`apps/`](apps/)             | Applications externes Flipper (`.fap`) en C, buildées avec [`ufbt`](https://github.com/flipperdevices/flipperzero-ufbt). |
+| [`apps/`](apps/)             | Applications externes Flipper (`.fap`) en C, buildées avec [`ufbt`](https://github.com/flipperdevices/flipperzero-ufbt). Inclut `quiz_master`, le maître du jeu Flipper-Quiz. |
 | [`esp32-quiz/`](esp32-quiz/) | **Flipper-Quiz** : serveur de quiz multijoueur local et hors-ligne pour l'ESP32-S2 (point d'accès Wi-Fi + portail captif + WebSocket). Voir son [README](esp32-quiz/README.md). |
+
+> 🚀 **Débutant ?** Suis le [**GUIDE.md**](GUIDE.md) : installation, flash et lancement d'une partie Flipper-Quiz pas-à-pas depuis Windows 11.
 
 ---
 
@@ -36,10 +38,14 @@ Applications externes (`.fap`) écrites en C avec l'outil [`ufbt`](https://githu
 ```
 .
 ├── apps/
-│   └── hello_world/          # App d'exemple minimale (GUI)
-│       ├── application.fam   # Manifeste de l'app
-│       └── hello_world.c     # Point d'entrée + logique
+│   ├── hello_world/          # App d'exemple minimale (GUI)
+│   │   ├── application.fam   # Manifeste de l'app
+│   │   └── hello_world.c     # Point d'entrée + logique
+│   └── quiz_master/          # Maître du jeu Flipper-Quiz (UART <-> ESP32)
+│       ├── application.fam
+│       └── quiz_master.c
 ├── esp32-quiz/               # Serveur de quiz ESP32-S2 (projet séparé)
+├── GUIDE.md                  # Guide débutant pas-à-pas (Windows 11)
 └── README.md
 ```
 
