@@ -34,6 +34,7 @@ static const byte DNS_PORT = 53;
 #define MAX_PLAYERS        16
 #define MAX_NAME_LEN       16
 #define QUESTION_TIME_MS   20000UL
+#define AP_MAX_CONN        8    // ESP32 SoftAP practical limit (~8 phones)
 
 // ---------------------------------------------------------------------------
 // Quiz content - edit freely
@@ -77,6 +78,14 @@ DNSServer       dnsServer;
 AsyncWebServer  server(80);
 AsyncWebSocket  ws("/ws");
 HardwareSerial  FlipperSerial(1);
+
+// Serializes every access to the game state, which is touched both by the loop
+// task (UART / question timeout) and by the AsyncTCP task (WebSocket and HTTP
+// admin callbacks). Held only at the outermost entry points below; the internal
+// game-flow functions assume it is already taken.
+static SemaphoreHandle_t gameMutex;
+#define GAME_LOCK()   xSemaphoreTake(gameMutex, portMAX_DELAY)
+#define GAME_UNLOCK() xSemaphoreGive(gameMutex)
 
 // ---------------------------------------------------------------------------
 // Embedded player UI (single page, vanilla JS, mobile-first)
@@ -150,7 +159,7 @@ function setStatus(t){document.getElementById("status").textContent=t;}
 
 function connect(){
   ws=new WebSocket("ws://"+location.host+"/ws");
-  ws.onopen=function(){setStatus(joined?("Connecte - "+myName):"Choisis ton pseudo");};
+  ws.onopen=function(){if(myName){ws.send(JSON.stringify({type:"join",name:myName}));setStatus("Connecte - "+myName);}else setStatus("Choisis ton pseudo");};
   ws.onclose=function(){setStatus("Deconnecte, reconnexion...");setTimeout(connect,1500);};
   ws.onmessage=function(e){handle(JSON.parse(e.data));};
 }
@@ -208,21 +217,39 @@ static Player* findPlayer(uint32_t clientId) {
     return nullptr;
 }
 
+// A disconnected slot with the same name: lets a reconnecting phone reclaim its
+// score instead of starting over.
+static Player* findReconnectSlot(const char* name) {
+    for (int i = 0; i < MAX_PLAYERS; i++)
+        if (!players[i].active && players[i].name[0] &&
+            strncmp(players[i].name, name, MAX_NAME_LEN) == 0)
+            return &players[i];
+    return nullptr;
+}
+
 static Player* addPlayer(uint32_t clientId) {
+    int reuse = -1;
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (!players[i].active) {
+        if (!players[i].active && players[i].name[0] == '\0') {  // prefer a truly empty slot
             players[i] = Player{};
             players[i].active   = true;
             players[i].clientId = clientId;
             return &players[i];
         }
+        if (!players[i].active && reuse < 0) reuse = i;  // else evict a disconnected ghost
+    }
+    if (reuse >= 0) {
+        players[reuse] = Player{};
+        players[reuse].active   = true;
+        players[reuse].clientId = clientId;
+        return &players[reuse];
     }
     return nullptr;
 }
 
 static void removePlayer(uint32_t clientId) {
     Player* p = findPlayer(clientId);
-    if (p) p->active = false;
+    if (p) p->active = false;  // keep name+score so the player can reconnect
 }
 
 static int activeCount() {
@@ -312,7 +339,7 @@ static void broadcastFinished() {
 }
 
 // ---------------------------------------------------------------------------
-// Game flow
+// Game flow (all called with gameMutex already held)
 // ---------------------------------------------------------------------------
 static void startQuestion(int idx) {
     currentQuestion = idx;
@@ -383,8 +410,10 @@ static void sendToFlipper() {
 }
 
 static void handleFlipperCommand(const String& cmd) {
+    GAME_LOCK();
     if (cmd == "NEXT" || cmd == "START") advance();
     else if (cmd == "RESET")             resetGame();
+    GAME_UNLOCK();
 }
 
 static void pollFlipper() {
@@ -411,47 +440,52 @@ static void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t le
     const char* type = doc["type"];
     if (!type) return;
 
+    GAME_LOCK();
     if (strcmp(type, "join") == 0) {
         const char* name = doc["name"] | "Joueur";
-        Player* p = findPlayer(client->id());
+        Player* p = findReconnectSlot(name);   // reconnect: reclaim slot + keep score
+        if (!p) p = findPlayer(client->id());
         if (!p) p = addPlayer(client->id());
-        if (!p) return;
-        strncpy(p->name, name, MAX_NAME_LEN);
-        p->name[MAX_NAME_LEN] = '\0';
+        if (p) {
+            p->active   = true;
+            p->clientId = client->id();
+            strncpy(p->name, name, MAX_NAME_LEN);
+            p->name[MAX_NAME_LEN] = '\0';
 
-        JsonDocument ack; ack["type"] = "joined";
-        String out; serializeJson(ack, out);
-        client->text(out);
+            JsonDocument ack; ack["type"] = "joined";
+            String out; serializeJson(ack, out);
+            client->text(out);
 
-        broadcastLobby();
-        sendToFlipper();
-        if (gameState == QUESTION) {  // late joiner: show the live question (this client only)
-            client->text(questionJson());
+            broadcastLobby();
+            sendToFlipper();
+            if (gameState == QUESTION) client->text(questionJson());  // late joiner: live question
         }
     } else if (strcmp(type, "answer") == 0) {
-        if (gameState != QUESTION) return;
         Player* p = findPlayer(client->id());
-        if (!p || p->answered) return;
         int choice = doc["choice"] | -1;
-        if (choice < 0 || choice > 3) return;
-        p->answered = true;
-        p->answer   = (uint8_t)choice;
-        p->answerMs = millis() - questionStartMs;
+        if (gameState == QUESTION && p && !p->answered && choice >= 0 && choice <= 3) {
+            p->answered = true;
+            p->answer   = (uint8_t)choice;
+            p->answerMs = millis() - questionStartMs;
 
-        JsonDocument ack; ack["type"] = "ack";
-        String out; serializeJson(ack, out);
-        client->text(out);
+            JsonDocument ack; ack["type"] = "ack";
+            String out; serializeJson(ack, out);
+            client->text(out);
 
-        if (allAnswered()) reveal();
+            if (allAnswered()) reveal();
+        }
     }
+    GAME_UNLOCK();
 }
 
 static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client,
                       AwsEventType type, void* arg, uint8_t* data, size_t len) {
     if (type == WS_EVT_DISCONNECT) {
+        GAME_LOCK();
         removePlayer(client->id());
         broadcastLobby();
         sendToFlipper();
+        GAME_UNLOCK();
     } else if (type == WS_EVT_DATA) {
         AwsFrameInfo* info = (AwsFrameInfo*)arg;
         if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
@@ -471,9 +505,9 @@ static void setupServer() {
     });
 
     // Browser-based game-master controls (works without the Flipper)
-    server.on("/admin/start", HTTP_GET, [](AsyncWebServerRequest* req) { advance();   req->send(200, "text/plain", "ok"); });
-    server.on("/admin/next",  HTTP_GET, [](AsyncWebServerRequest* req) { advance();   req->send(200, "text/plain", "ok"); });
-    server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) { resetGame(); req->send(200, "text/plain", "ok"); });
+    server.on("/admin/start", HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    server.on("/admin/next",  HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); resetGame(); GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
 
     // Captive-portal: any other request (incl. OS connectivity-check URLs such
     // as /generate_204, /hotspot-detect.html, /ncsi.txt) is redirected to the
@@ -488,11 +522,12 @@ static void setupServer() {
 // ---------------------------------------------------------------------------
 void setup() {
     Serial.begin(115200);
+    gameMutex = xSemaphoreCreateMutex();
     FlipperSerial.begin(FLIPPER_UART_BAUD, SERIAL_8N1, FLIPPER_UART_RX_PIN, FLIPPER_UART_TX_PIN);
 
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
-    WiFi.softAP(AP_SSID);  // open network
+    WiFi.softAP(AP_SSID, NULL, 1, 0, AP_MAX_CONN);  // open network, up to AP_MAX_CONN stations
 
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(DNS_PORT, "*", AP_IP);  // resolve every domain to the ESP32
@@ -507,6 +542,8 @@ void loop() {
     ws.cleanupClients();
     pollFlipper();
 
+    GAME_LOCK();
     if (gameState == QUESTION && millis() - questionStartMs > QUESTION_TIME_MS)
         reveal();
+    GAME_UNLOCK();
 }

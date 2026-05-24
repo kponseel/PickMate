@@ -51,6 +51,7 @@ static void uart_rx_cb(FuriHalSerialHandle* handle, FuriHalSerialRxEvent event, 
 }
 
 static void uart_send(QuizApp* app, const char* s) {
+    if(!app->serial) return;
     furi_hal_serial_tx(app->serial, (const uint8_t*)s, strlen(s));
 }
 
@@ -139,12 +140,17 @@ int32_t quiz_master_app(void* p) {
     gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
 
     app->serial = furi_hal_serial_control_acquire(FuriHalSerialIdUsart);
-    furi_check(app->serial);
-    furi_hal_serial_init(app->serial, UART_BAUD);
-    furi_hal_serial_async_rx_start(app->serial, uart_rx_cb, app, false);
-
-    app->worker = furi_thread_alloc_ex("QuizUartWorker", 2048, uart_worker, app);
-    furi_thread_start(app->worker);
+    if(app->serial) {
+        furi_hal_serial_init(app->serial, UART_BAUD);
+        furi_hal_serial_async_rx_start(app->serial, uart_rx_cb, app, false);
+        app->worker = furi_thread_alloc_ex("QuizUartWorker", 2048, uart_worker, app);
+        furi_thread_start(app->worker);
+    } else {
+        // USART busy (qFlipper / CLI / another app holding it): show a hint
+        // instead of crashing on furi_check.
+        strncpy(app->quiz.state, "USART occupe!", sizeof(app->quiz.state) - 1);
+        app->quiz.state[sizeof(app->quiz.state) - 1] = '\0';
+    }
 
     InputEvent event;
     bool running = true;
@@ -163,12 +169,15 @@ int32_t quiz_master_app(void* p) {
     }
 
     app->running = false;
-    furi_thread_join(app->worker);
-    furi_thread_free(app->worker);
-
-    furi_hal_serial_async_rx_stop(app->serial);
-    furi_hal_serial_deinit(app->serial);
-    furi_hal_serial_control_release(app->serial);
+    if(app->worker) {
+        furi_thread_join(app->worker);
+        furi_thread_free(app->worker);
+    }
+    if(app->serial) {
+        furi_hal_serial_async_rx_stop(app->serial);
+        furi_hal_serial_deinit(app->serial);
+        furi_hal_serial_control_release(app->serial);
+    }
 
     gui_remove_view_port(app->gui, app->view_port);
     furi_record_close(RECORD_GUI);
