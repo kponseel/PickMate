@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pio:*)",
+      "Bash(ufbt:*)",
+      "Bash(git pull:*)",
+      "Bash(git clone:*)"
+    ]
+  }
+}
