@@ -61,6 +61,10 @@ static void parse_line(QuizApp* app, const char* line) {
     } else if(strncmp(line, "STATE:", 6) == 0) {
         strncpy(app->quiz.state, line + 6, sizeof(app->quiz.state) - 1);
         app->quiz.state[sizeof(app->quiz.state) - 1] = '\0';
+        // Back to lobby / end of game: clear stale question info from the screen
+        if(strcmp(app->quiz.state, "lobby") == 0 || strcmp(app->quiz.state, "finished") == 0) {
+            app->quiz.qinfo[0] = '\0';
+        }
     } else if(strncmp(line, "Q:", 2) == 0) {
         strncpy(app->quiz.qinfo, line + 2, sizeof(app->quiz.qinfo) - 1);
         app->quiz.qinfo[sizeof(app->quiz.qinfo) - 1] = '\0';

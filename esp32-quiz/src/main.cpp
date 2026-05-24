@@ -24,10 +24,11 @@ static const IPAddress AP_GATEWAY(192, 168, 4, 1);
 static const IPAddress AP_SUBNET(255, 255, 255, 0);
 static const byte DNS_PORT = 53;
 
-// UART link to the Flipper Zero. These pins MUST match how the ESP32 is wired
-// to the Flipper's GPIO header on your board; adjust if needed.
-#define FLIPPER_UART_RX_PIN 18
-#define FLIPPER_UART_TX_PIN 17
+// UART link to the Flipper Zero. On the official Wi-Fi Dev Board the Flipper's
+// USART (pin 13 TX / pin 14 RX) is wired to the ESP32-S2 UART0 pins; we route
+// FlipperSerial (UART1) onto them via the GPIO matrix.
+#define FLIPPER_UART_RX_PIN 44  // <- Flipper pin 13 (TX)
+#define FLIPPER_UART_TX_PIN 43  // -> Flipper pin 14 (RX)
 #define FLIPPER_UART_BAUD   115200
 
 #define MAX_PLAYERS        16
