@@ -3,7 +3,7 @@
 > Document auto-suffisant. Contexte, protocoles, diagnostic + corrections
 > appliquées, et CODE SOURCE COMPLET (à jour) des deux programmes.
 >
-> STATUT : ✅ Liaison UART corrigée + durcissement audit appliqué.
+> STATUT : ✅ Liaison UART corrigée + durcissement audit appliqué + libs vérifiées.
 
 ## Objectif du projet
 Quiz multijoueur **local et hors-ligne**. La Wi-Fi Developer Board (ESP32-S2) du
@@ -13,26 +13,23 @@ Flipper Zero sert de pupitre au maître du jeu et dialogue avec l'ESP32 en UART.
 
 ## ✅ Corrections appliquées
 **1. Broches UART de l'ESP32 (cause racine du "Joueurs: 0" figé).**
-Sur la Wi-Fi Developer Board officielle, l'USART du Flipper (broche 13 = TX,
-broche 14 = RX) est câblé sur l'**UART0 matériel de l'ESP32-S2** (TX0 = GPIO43,
-RX0 = GPIO44). Corrigé : `FLIPPER_UART_RX_PIN 44`, `FLIPPER_UART_TX_PIN 43`.
+USART du Flipper (pin 13 = TX, pin 14 = RX) câblé sur l'**UART0 de l'ESP32-S2**
+(TX0 = GPIO43, RX0 = GPIO44). Corrigé : `FLIPPER_UART_RX_PIN 44`, `TX_PIN 43`.
 
-**2. Côté Flipper : `furi_hal_serial_control_acquire(FuriHalSerialIdUsart)`** cible
-déjà 13/14. L'app gère maintenant proprement le cas "USART occupé" (affiche un
-message au lieu de crasher sur `furi_check`).
+**2. Flipper** : `furi_hal_serial_control_acquire(FuriHalSerialIdUsart)` cible
+13/14 ; l'app gère le cas "USART occupé" (message au lieu de crash `furi_check`).
 
 **3. Affichage** : `qinfo` vidé quand l'état repasse à `lobby`/`finished`.
 
-## ✅ Durcissement issu de l'audit complet
-- **AP Wi-Fi** : `max_connection` relevé à 8 (le défaut 4 limitait à 4 joueurs).
-- **Concurrence** : `gameMutex` (FreeRTOS) sérialise tout accès à l'état du jeu,
-  touché à la fois par la tâche loop() (UART/timeout) et la tâche AsyncTCP
-  (WebSocket + routes /admin). Verrou pris uniquement aux points d'entrée ; les
-  fonctions internes du jeu supposent le verrou déjà tenu (pas de ré-entrance).
-- **Reconnexion** : à la reconnexion WebSocket, le client renvoie `join`, et le
-  serveur réutilise le slot du même pseudo (score conservé) au lieu d'en créer
-  un nouveau.
-- **Libs ESP32** épinglées à des tags (reproductibilité).
+## ✅ Durcissement issu de l'audit
+- **AP Wi-Fi** : `max_connection` = 8 (défaut 4 limitait à 4 joueurs).
+- **Concurrence** : `gameMutex` (FreeRTOS) sérialise tout accès à l'état du jeu
+  (tâche loop() UART/timeout vs tâche AsyncTCP WebSocket + /admin). Verrou pris
+  uniquement aux points d'entrée ; fonctions internes sans ré-entrance.
+- **Reconnexion** : le client renvoie `join` ; le serveur réutilise le slot du
+  même pseudo (score conservé).
+- **Libs ESP32 épinglées à des tags VÉRIFIÉS** : ESPAsyncWebServer v3.11.0,
+  AsyncTCP v3.4.10 (ArduinoJson ^7.0.4).
 
 ## Matériel & versions
 - Flipper Zero, firmware **OFW 1.4.3** (build 5 déc 2025), radio 1.20.0 LITE.
@@ -69,9 +66,9 @@ Serveur -> client : joined | lobby{players} | question{index,total,q,options,tim
 3. FLIPPER : le compteur "Joueurs" doit bouger quand un téléphone rejoint.
 
 ## Pistes restantes (non bloquantes)
-- /admin/* non authentifié (n'importe quel joueur peut piloter) : volontaire,
-  secours sans Flipper ; ajouter un code PIN si besoin.
+- /admin/* non authentifié (volontaire, secours sans Flipper) ; ajouter un PIN si besoin.
 - Wi-Fi ESP32 plafonne en pratique à ~8 stations (matériel).
+- board PlatformIO générique `esp32-s2-saola-1` ; ajuster si upload capricieux.
 
 ---
 
@@ -99,8 +96,8 @@ build_flags =
 ; says the tag is missing, bump/remove the "#vX.Y.Z" suffix.
 lib_deps =
     bblanchon/ArduinoJson @ ^7.0.4
-    https://github.com/ESP32Async/ESPAsyncWebServer.git#v3.6.0
-    https://github.com/ESP32Async/AsyncTCP.git#v3.3.2
+    https://github.com/ESP32Async/ESPAsyncWebServer.git#v3.11.0
+    https://github.com/ESP32Async/AsyncTCP.git#v3.4.10
 ```
 
 ## esp32-quiz/src/main.cpp
