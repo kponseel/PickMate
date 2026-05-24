@@ -1,9 +1,9 @@
 # DEBUG BRIEF — Flipper-Quiz (ESP32-S2 + Flipper Zero)
 
-> Document auto-suffisant. Contexte, protocoles, diagnostic + corrections
-> appliquées, et CODE SOURCE COMPLET (à jour) des deux programmes.
+> Document auto-suffisant. Contexte, protocoles, corrections appliquées, et
+> CODE SOURCE COMPLET (à jour) des deux programmes.
 >
-> STATUT : ✅ Liaison UART corrigée + durcissement audit appliqué + libs vérifiées.
+> STATUT : ✅ UART corrigé + durcissement audit + page admin protégée.
 
 ## Objectif du projet
 Quiz multijoueur **local et hors-ligne**. La Wi-Fi Developer Board (ESP32-S2) du
@@ -11,25 +11,14 @@ Flipper crée un point d'accès Wi-Fi ouvert "Flipper-Quiz", sert une page web a
 smartphones (portail captif + WebSocket) et gère toute la logique du jeu. Le
 Flipper Zero sert de pupitre au maître du jeu et dialogue avec l'ESP32 en UART.
 
-## ✅ Corrections appliquées
-**1. Broches UART de l'ESP32 (cause racine du "Joueurs: 0" figé).**
-USART du Flipper (pin 13 = TX, pin 14 = RX) câblé sur l'**UART0 de l'ESP32-S2**
-(TX0 = GPIO43, RX0 = GPIO44). Corrigé : `FLIPPER_UART_RX_PIN 44`, `TX_PIN 43`.
-
-**2. Flipper** : `furi_hal_serial_control_acquire(FuriHalSerialIdUsart)` cible
-13/14 ; l'app gère le cas "USART occupé" (message au lieu de crash `furi_check`).
-
-**3. Affichage** : `qinfo` vidé quand l'état repasse à `lobby`/`finished`.
-
-## ✅ Durcissement issu de l'audit
-- **AP Wi-Fi** : `max_connection` = 8 (défaut 4 limitait à 4 joueurs).
-- **Concurrence** : `gameMutex` (FreeRTOS) sérialise tout accès à l'état du jeu
-  (tâche loop() UART/timeout vs tâche AsyncTCP WebSocket + /admin). Verrou pris
-  uniquement aux points d'entrée ; fonctions internes sans ré-entrance.
-- **Reconnexion** : le client renvoie `join` ; le serveur réutilise le slot du
-  même pseudo (score conservé).
-- **Libs ESP32 épinglées à des tags VÉRIFIÉS** : ESPAsyncWebServer v3.11.0,
-  AsyncTCP v3.4.10 (ArduinoJson ^7.0.4).
+## ✅ Corrections / fonctionnalités clés
+- **UART** : pins ESP32 = UART0 (RX0=GPIO44 <- Flipper pin13 TX ; TX0=GPIO43 -> Flipper pin14 RX), 115200 8N1.
+- **Flipper** : `furi_hal_serial_control_acquire(FuriHalSerialIdUsart)` (13/14) ; cas "USART occupé" géré sans crash ; `qinfo` vidé en lobby/finished.
+- **AP Wi-Fi** : `max_connection` = 8.
+- **Concurrence** : `gameMutex` (FreeRTOS) sérialise l'état du jeu (loop() vs tâche AsyncTCP) ; verrou aux points d'entrée seulement, pas de ré-entrance.
+- **Reconnexion** : le client renvoie `join` ; le serveur réutilise le slot du même pseudo (score conservé).
+- **Page admin** : `/admin` (lien depuis la page joueur), protégée HTTP Basic Auth (identifiant `admin`, mot de passe `adminadmin`) — boutons Démarrer/Suivant/Reset + état en direct via `/admin/state`. NB : Wi-Fi ouvert => clair, garde-fou seulement.
+- **Libs** épinglées (vérifiées) : ESPAsyncWebServer v3.11.0, AsyncTCP v3.4.10, ArduinoJson ^7.0.4.
 
 ## Matériel & versions
 - Flipper Zero, firmware **OFW 1.4.3** (build 5 déc 2025), radio 1.20.0 LITE.
@@ -46,10 +35,6 @@ USART du Flipper (pin 13 = TX, pin 14 = RX) câblé sur l'**UART0 de l'ESP32-S2*
                                 +-------------------------------+
 ```
 
-## Mapping UART confirmé (board officielle)
-- Flipper **pin 13 (TX)** -> **ESP32-S2 RX0 = GPIO44**
-- Flipper **pin 14 (RX)** -> **ESP32-S2 TX0 = GPIO43** ; 115200 bauds, 8N1.
-
 ## Protocole UART (Flipper <-> ESP32) — lignes ASCII terminées par '\n'
 ESP32 -> Flipper : `PLAYERS:<n>` | `STATE:<lobby|question|reveal|finished>` | `Q:<i>/<n>`
 Flipper -> ESP32 : `START` / `NEXT` (advance) | `RESET`
@@ -59,14 +44,21 @@ Client -> serveur : {"type":"join","name":"Bob"} | {"type":"answer","choice":0..
 Serveur -> client : joined | lobby{players} | question{index,total,q,options,time}
                     | ack | reveal{correct,scores[]} | finished{scores[]}
 
+## Endpoints HTTP
+- `GET /`            : page joueur (lien "Admin" en bas)
+- `GET /admin`       : pupitre maître (Basic Auth)
+- `GET /admin/state` : état JSON (Basic Auth)
+- `GET /admin/next|start|reset` : actions (Basic Auth)
+- `/ws`              : WebSocket ; tout le reste -> redirection portail captif
+
 ## Méthode de test par couche
 1. ESP32 SEUL : `pio device monitor` -> "Flipper-Quiz AP ... up at 192.168.4.1" ;
-   piloter via `http://192.168.4.1/admin/next`.
+   piloter via la page Admin (admin/adminadmin) ou `http://192.168.4.1/admin/next`.
 2. UART : chaque advance émet PLAYERS:/STATE:/Q: ; `NEXT\n` fait avancer.
 3. FLIPPER : le compteur "Joueurs" doit bouger quand un téléphone rejoint.
 
 ## Pistes restantes (non bloquantes)
-- /admin/* non authentifié (volontaire, secours sans Flipper) ; ajouter un PIN si besoin.
+- Basic Auth en clair sur Wi-Fi ouvert (pas de TLS) : garde-fou, pas une sécurité.
 - Wi-Fi ESP32 plafonne en pratique à ~8 stations (matériel).
 - board PlatformIO générique `esp32-s2-saola-1` ; ajuster si upload capricieux.
 
@@ -139,6 +131,11 @@ static const byte DNS_PORT = 53;
 #define MAX_NAME_LEN       16
 #define QUESTION_TIME_MS   20000UL
 #define AP_MAX_CONN        8    // ESP32 SoftAP practical limit (~8 phones)
+
+// Admin panel credentials (HTTP Basic Auth). NOTE: plaintext over an open
+// Wi-Fi network - a convenience gate, not real security.
+#define ADMIN_USER "admin"
+#define ADMIN_PASS "adminadmin"
 
 // ---------------------------------------------------------------------------
 // Quiz content - edit freely
@@ -255,6 +252,8 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
   <ol id="board"></ol>
 </div>
 
+<div class="center muted" style="margin-top:12px"><a href="/admin" style="color:#778">Admin</a></div>
+
 <script>
 var ws, joined=false, myName="", answered=false, myChoice=-1, answeredCorrect=false;
 var screens={join:"s-join",wait:"s-wait",question:"s-question",reveal:"s-reveal",end:"s-end"};
@@ -310,6 +309,44 @@ for(var i=0;i<4;i++){(function(i){
 })(i);}
 
 connect();show("join");
+</script></body></html>)HTML";
+
+// ---------------------------------------------------------------------------
+// Embedded admin control panel (served behind HTTP Basic Auth)
+// ---------------------------------------------------------------------------
+static const char ADMIN_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quiz - Admin</title>
+<style>
+  *{box-sizing:border-box;font-family:system-ui,sans-serif}
+  body{background:#0f1020;color:#fff;margin:0;padding:20px;text-align:center}
+  h1{font-size:1.4rem;margin:8px 0 16px}
+  .card{background:#1b1d35;border-radius:12px;padding:16px;margin:0 auto 16px;max-width:420px}
+  .row{display:flex;justify-content:space-between;padding:6px 2px;color:#cdd}
+  .row b{color:#fff}
+  button{width:100%;max-width:420px;padding:18px;font-size:1.2rem;font-weight:700;border:none;border-radius:12px;color:#fff;margin:8px auto;display:block;cursor:pointer}
+  .next{background:#26890c}.reset{background:#e6394a}
+  a{color:#9aa}
+</style></head><body>
+<h1>Quiz &mdash; Maitre du jeu</h1>
+<div class="card">
+  <div class="row"><span>Etat</span><b id="state">...</b></div>
+  <div class="row"><span>Joueurs</span><b id="players">0</b></div>
+  <div class="row"><span>Question</span><b id="q">-</b></div>
+</div>
+<button class="next" onclick="act('next')">Demarrer / Question suivante</button>
+<button class="reset" onclick="act('reset')">Recommencer (Reset)</button>
+<p><a href="/">Retour a la page joueur</a></p>
+<script>
+function act(a){fetch('/admin/'+a).then(refresh);}
+function refresh(){fetch('/admin/state').then(function(r){return r.json();}).then(function(s){
+  document.getElementById('state').textContent=s.state;
+  document.getElementById('players').textContent=s.players;
+  document.getElementById('q').textContent=s.qt?(s.qi+'/'+s.qt):'-';
+}).catch(function(){});}
+setInterval(refresh,1500);refresh();
 </script></body></html>)HTML";
 
 // ---------------------------------------------------------------------------
@@ -600,6 +637,14 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client,
 // ---------------------------------------------------------------------------
 // HTTP / captive portal
 // ---------------------------------------------------------------------------
+static bool adminAuth(AsyncWebServerRequest* req) {
+    if (!req->authenticate(ADMIN_USER, ADMIN_PASS)) {
+        req->requestAuthentication();
+        return false;
+    }
+    return true;
+}
+
 static void setupServer() {
     ws.onEvent(onWsEvent);
     server.addHandler(&ws);
@@ -608,10 +653,30 @@ static void setupServer() {
         req->send(200, "text/html", INDEX_HTML);
     });
 
-    // Browser-based game-master controls (works without the Flipper)
-    server.on("/admin/start", HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
-    server.on("/admin/next",  HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
-    server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); resetGame(); GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    // Admin control panel (password-protected via HTTP Basic Auth), reachable
+    // from the "Admin" link on the player page. Works without the Flipper.
+    server.on("/admin", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!adminAuth(req)) return;
+        req->send(200, "text/html", ADMIN_HTML);
+    });
+    server.on("/admin/state", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!adminAuth(req)) return;
+        GAME_LOCK();
+        const char* st = stateName();
+        int  pc  = activeCount();
+        bool inq = (gameState == QUESTION || gameState == REVEAL);
+        int  qi  = currentQuestion + 1;
+        GAME_UNLOCK();
+        JsonDocument doc;
+        doc["state"]   = st;
+        doc["players"] = pc;
+        if (inq) { doc["qi"] = qi; doc["qt"] = QUESTION_COUNT; }
+        String out; serializeJson(doc, out);
+        req->send(200, "application/json", out);
+    });
+    server.on("/admin/start", HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    server.on("/admin/next",  HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); resetGame(); GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
 
     // Captive-portal: any other request (incl. OS connectivity-check URLs such
     // as /generate_204, /hotspot-detect.html, /ncsi.txt) is redirected to the

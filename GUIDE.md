@@ -132,8 +132,16 @@ cd PickMate
    (Quitte le moniteur avec `Ctrl+C`.)
 
 ✅ À ce stade, même sans le Flipper, tu peux déjà tester : connecte ton téléphone
-au Wi-Fi **Flipper-Quiz** et ouvre la page de jeu. Pour piloter la partie depuis
-un navigateur, va sur `http://192.168.4.1/admin/next`.
+au Wi-Fi **Flipper-Quiz** et ouvre la page de jeu. En bas de la page, le lien
+**« Admin »** ouvre le pupitre du maître du jeu (`http://192.168.4.1/admin`),
+**protégé par mot de passe** :
+
+- **Identifiant** : `admin`
+- **Mot de passe** : `adminadmin`
+
+Depuis cette page : boutons *Démarrer / Question suivante* et *Reset*, avec
+l'état en direct (joueurs, question). ⚠️ Sur un Wi-Fi ouvert le mot de passe
+circule en clair : c'est un simple garde-fou, pas une vraie sécurité.
 
 ---
 
@@ -186,8 +194,8 @@ Plus tard, l'app reste accessible sur le Flipper dans **Apps → GPIO → Quiz M
 5. Sur les téléphones : 4 gros boutons **A / B / C / D**. Plus on répond **vite
    et juste**, plus on marque de points. À la fin, le **classement** s'affiche.
 
-> Pas de Flipper sous la main ? Pilote depuis un navigateur :
-> `http://192.168.4.1/admin/next` (avancer) et `/admin/reset` (recommencer).
+> Pas de Flipper sous la main ? Pilote depuis le lien **Admin** de la page joueur
+> (ou `http://192.168.4.1/admin`), identifiant `admin` / mot de passe `adminadmin`.
 
 ---
 

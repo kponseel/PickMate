@@ -36,6 +36,11 @@ static const byte DNS_PORT = 53;
 #define QUESTION_TIME_MS   20000UL
 #define AP_MAX_CONN        8    // ESP32 SoftAP practical limit (~8 phones)
 
+// Admin panel credentials (HTTP Basic Auth). NOTE: plaintext over an open
+// Wi-Fi network - a convenience gate, not real security.
+#define ADMIN_USER "admin"
+#define ADMIN_PASS "adminadmin"
+
 // ---------------------------------------------------------------------------
 // Quiz content - edit freely
 // ---------------------------------------------------------------------------
@@ -151,6 +156,8 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
   <ol id="board"></ol>
 </div>
 
+<div class="center muted" style="margin-top:12px"><a href="/admin" style="color:#778">Admin</a></div>
+
 <script>
 var ws, joined=false, myName="", answered=false, myChoice=-1, answeredCorrect=false;
 var screens={join:"s-join",wait:"s-wait",question:"s-question",reveal:"s-reveal",end:"s-end"};
@@ -206,6 +213,44 @@ for(var i=0;i<4;i++){(function(i){
 })(i);}
 
 connect();show("join");
+</script></body></html>)HTML";
+
+// ---------------------------------------------------------------------------
+// Embedded admin control panel (served behind HTTP Basic Auth)
+// ---------------------------------------------------------------------------
+static const char ADMIN_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quiz - Admin</title>
+<style>
+  *{box-sizing:border-box;font-family:system-ui,sans-serif}
+  body{background:#0f1020;color:#fff;margin:0;padding:20px;text-align:center}
+  h1{font-size:1.4rem;margin:8px 0 16px}
+  .card{background:#1b1d35;border-radius:12px;padding:16px;margin:0 auto 16px;max-width:420px}
+  .row{display:flex;justify-content:space-between;padding:6px 2px;color:#cdd}
+  .row b{color:#fff}
+  button{width:100%;max-width:420px;padding:18px;font-size:1.2rem;font-weight:700;border:none;border-radius:12px;color:#fff;margin:8px auto;display:block;cursor:pointer}
+  .next{background:#26890c}.reset{background:#e6394a}
+  a{color:#9aa}
+</style></head><body>
+<h1>Quiz &mdash; Maitre du jeu</h1>
+<div class="card">
+  <div class="row"><span>Etat</span><b id="state">...</b></div>
+  <div class="row"><span>Joueurs</span><b id="players">0</b></div>
+  <div class="row"><span>Question</span><b id="q">-</b></div>
+</div>
+<button class="next" onclick="act('next')">Demarrer / Question suivante</button>
+<button class="reset" onclick="act('reset')">Recommencer (Reset)</button>
+<p><a href="/">Retour a la page joueur</a></p>
+<script>
+function act(a){fetch('/admin/'+a).then(refresh);}
+function refresh(){fetch('/admin/state').then(function(r){return r.json();}).then(function(s){
+  document.getElementById('state').textContent=s.state;
+  document.getElementById('players').textContent=s.players;
+  document.getElementById('q').textContent=s.qt?(s.qi+'/'+s.qt):'-';
+}).catch(function(){});}
+setInterval(refresh,1500);refresh();
 </script></body></html>)HTML";
 
 // ---------------------------------------------------------------------------
@@ -496,6 +541,14 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client,
 // ---------------------------------------------------------------------------
 // HTTP / captive portal
 // ---------------------------------------------------------------------------
+static bool adminAuth(AsyncWebServerRequest* req) {
+    if (!req->authenticate(ADMIN_USER, ADMIN_PASS)) {
+        req->requestAuthentication();
+        return false;
+    }
+    return true;
+}
+
 static void setupServer() {
     ws.onEvent(onWsEvent);
     server.addHandler(&ws);
@@ -504,10 +557,30 @@ static void setupServer() {
         req->send(200, "text/html", INDEX_HTML);
     });
 
-    // Browser-based game-master controls (works without the Flipper)
-    server.on("/admin/start", HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
-    server.on("/admin/next",  HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
-    server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) { GAME_LOCK(); resetGame(); GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    // Admin control panel (password-protected via HTTP Basic Auth), reachable
+    // from the "Admin" link on the player page. Works without the Flipper.
+    server.on("/admin", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!adminAuth(req)) return;
+        req->send(200, "text/html", ADMIN_HTML);
+    });
+    server.on("/admin/state", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!adminAuth(req)) return;
+        GAME_LOCK();
+        const char* st = stateName();
+        int  pc  = activeCount();
+        bool inq = (gameState == QUESTION || gameState == REVEAL);
+        int  qi  = currentQuestion + 1;
+        GAME_UNLOCK();
+        JsonDocument doc;
+        doc["state"]   = st;
+        doc["players"] = pc;
+        if (inq) { doc["qi"] = qi; doc["qt"] = QUESTION_COUNT; }
+        String out; serializeJson(doc, out);
+        req->send(200, "application/json", out);
+    });
+    server.on("/admin/start", HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    server.on("/admin/next",  HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); resetGame(); GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
 
     // Captive-portal: any other request (incl. OS connectivity-check URLs such
     // as /generate_204, /hotspot-detect.html, /ncsi.txt) is redirected to the
