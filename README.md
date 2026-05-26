@@ -12,6 +12,8 @@ Dépôt de développement pour le **Flipper Zero** et sa **Wi-Fi Developer Board
 > 🚀 **Débutant ?** Suis le [**GUIDE.md**](GUIDE.md) : installation, flash et lancement d'une partie GamesHub pas-à-pas depuis Windows 11.
 >
 > 🤖 **Tu utilises Claude Code en local ?** Le fichier [**CLAUDE.md**](CLAUDE.md) contient les consignes que Claude lit automatiquement (matériel cible, commandes de flash, pièges).
+>
+> 🎲 **Les 16 jeux et leurs règles** : [**GAMES.md**](GAMES.md).
 
 ## Démarrage rapide (Windows 11, PowerShell)
 
@@ -66,9 +68,10 @@ Applications externes (`.fap`) écrites en C avec l'outil [`ufbt`](https://githu
 │   └── gameshub/          # Maître du jeu GamesHub (UART <-> ESP32)
 │       ├── application.fam
 │       └── gameshub.c
-├── esp32-hub/               # Serveur de quiz ESP32-S2 (projet séparé)
+├── esp32-hub/               # Serveur GamesHub ESP32-S2 (16 jeux, projet séparé)
 ├── CLAUDE.md                 # Consignes projet pour Claude Code (local)
 ├── GUIDE.md                  # Guide débutant pas-à-pas (Windows 11)
+├── GAMES.md                  # Présentation des 16 jeux + règles
 ├── DEBUG_BRIEF.md            # Contexte + protocoles + code complet (debug)
 └── README.md
 ```
