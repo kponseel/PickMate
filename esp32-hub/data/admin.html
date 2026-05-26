@@ -5,34 +5,148 @@
 <title>GamesHub - Admin</title>
 <style>
   *{box-sizing:border-box;font-family:system-ui,sans-serif}
-  body{background:#0f1020;color:#fff;margin:0;padding:20px;text-align:center}
-  h1{font-size:1.4rem;margin:8px 0 16px}
-  .card{background:#1b1d35;border-radius:12px;padding:16px;margin:0 auto 16px;max-width:420px}
-  .row{display:flex;justify-content:space-between;padding:6px 2px;color:#cdd}
+  body{background:#0f1020;color:#fff;margin:0;padding:20px;max-width:760px;margin-left:auto;margin-right:auto}
+  h1{font-size:1.4rem;margin:8px 0 16px;text-align:center}
+  h2{font-size:1rem;margin:18px 0 8px;color:#cdd;letter-spacing:.5px;text-transform:uppercase}
+  .card{background:#1b1d35;border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .row{display:flex;justify-content:space-between;padding:4px 0;color:#cdd}
   .row b{color:#fff}
-  button{width:100%;max-width:420px;padding:18px;font-size:1.2rem;font-weight:700;border:none;border-radius:12px;color:#fff;margin:8px auto;display:block;cursor:pointer}
-  .next{background:#26890c}.reset{background:#e6394a}
-  a{color:#9aa}
+  button{width:100%;padding:16px;font-size:1.05rem;font-weight:700;border:none;border-radius:10px;color:#fff;margin:6px 0;cursor:pointer}
+  .next{background:#26890c} .reset{background:#e6394a}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .actions button{margin:0}
+  table{width:100%;border-collapse:collapse;font-size:0.85rem}
+  th,td{padding:6px 8px;text-align:left;border-bottom:1px solid #2a2c4a}
+  th{color:#9aa;font-weight:600;font-size:0.78rem;text-transform:uppercase;letter-spacing:.5px}
+  tr.offline td{color:#778}
+  .crown{color:#ffd56b}
+  .log{max-height:280px;overflow-y:auto;background:#11122a;border-radius:10px;padding:8px 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.78rem;line-height:1.5}
+  .log .e{display:flex;gap:8px;align-items:baseline;padding:2px 0;border-bottom:1px solid #1f2140}
+  .log .e:last-child{border:none}
+  .log .ts{color:#778;min-width:55px;flex-shrink:0}
+  .log .ty{font-weight:700;min-width:120px;flex-shrink:0}
+  .log .ty.player_join{color:#26890c}
+  .log .ty.player_leave{color:#e6394a}
+  .log .ty.host_change{color:#ffd56b}
+  .log .ty.game_select{color:#5b6cff}
+  .log .ty.game_advance{color:#1368ce}
+  .log .ty.game_reset{color:#d89e00}
+  .log .who{color:#fff}
+  .log .meta{color:#9aa;font-size:0.72rem}
+  .footer{text-align:center;color:#778;margin-top:18px}
+  .footer a{color:#9aa}
 </style></head><body>
 <h1>GamesHub &mdash; Admin</h1>
+
 <div class="card">
   <div class="row"><span>Jeu</span><b id="game">-</b></div>
   <div class="row"><span>Phase</span><b id="phase">...</b></div>
-  <div class="row"><span>Joueurs</span><b id="players">0</b></div>
-  <div class="row"><span>Hote</span><b id="host">-</b></div>
+  <div class="row"><span>Joueurs connectés</span><b id="players">0</b></div>
+  <div class="row"><span>Hôte 👑</span><b id="host">-</b></div>
   <div class="row"><span>Progression</span><b id="progress">-</b></div>
 </div>
-<button class="next" onclick="act('next')">Demarrer / Suivant</button>
-<button class="reset" onclick="act('reset')">Reset</button>
-<p><a href="/">Retour a la page joueur</a></p>
+
+<div class="actions">
+  <button class="next" onclick="act('next')">Démarrer / Suivant</button>
+  <button class="reset" onclick="act('reset')">Reset</button>
+</div>
+
+<h2>Roster complet (avec historique)</h2>
+<div class="card" style="padding:8px">
+  <table id="roster">
+    <thead><tr>
+      <th>Nom</th><th>Score</th><th>IP</th><th>Conn.</th><th>Dernière activité</th>
+    </tr></thead>
+    <tbody><tr><td colspan="5" style="color:#778;text-align:center">Aucun joueur encore</td></tr></tbody>
+  </table>
+</div>
+
+<h2>Journal d'événements <span id="logCount" style="color:#9aa;font-weight:normal;font-size:0.8rem"></span></h2>
+<div class="card" style="padding:0">
+  <div class="log" id="log">(vide)</div>
+</div>
+
+<div class="footer">
+  <a href="/">← Retour à la page joueur</a>
+</div>
+
 <script>
-function act(a){fetch('/admin/'+a).then(refresh);}
-function refresh(){fetch('/admin/state').then(function(r){return r.json();}).then(function(s){
-  document.getElementById('game').textContent=s.game||'-';
-  document.getElementById('phase').textContent=s.phase;
-  document.getElementById('players').textContent=s.players;
-  document.getElementById('host').textContent=s.host||'-';
-  document.getElementById('progress').textContent=s.progress||'-';
-}).catch(function(){});}
-setInterval(refresh,1500);refresh();
+function $(id){return document.getElementById(id);}
+function escapeHtml(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML;}
+
+function act(a){fetch('/admin/'+a).then(refreshAll).catch(function(){});}
+
+function fmtAge(ms){
+  if (ms < 0) return "à l'instant";
+  if (ms < 1000) return ms+"ms";
+  var s = Math.floor(ms / 1000);
+  if (s < 60) return s+"s";
+  var m = Math.floor(s / 60);
+  if (m < 60) return m+"min";
+  var h = Math.floor(m / 60);
+  return h+"h"+(m % 60)+"min";
+}
+
+function refreshState(){
+  return fetch('/admin/state').then(function(r){return r.json();}).then(function(s){
+    $('game').textContent     = s.game||'-';
+    $('phase').textContent    = s.phase;
+    $('players').textContent  = s.players;
+    $('host').textContent     = s.host||'-';
+    $('progress').textContent = s.progress||'-';
+  }).catch(function(){});
+}
+
+function refreshRoster(){
+  return fetch('/admin/players').then(function(r){return r.json();}).then(function(s){
+    var tbody = $('roster').querySelector('tbody');
+    if (!s.players || !s.players.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:#778;text-align:center">Aucun joueur encore</td></tr>';
+      return;
+    }
+    s.players.sort(function(a,b){ if(a.connected!==b.connected) return b.connected-a.connected; return a.name.localeCompare(b.name); });
+    tbody.innerHTML = s.players.map(function(p){
+      var crown = p.host ? '<span class="crown">👑</span> ' : '';
+      var dot   = p.connected ? '🟢' : '⚫';
+      var age   = (p.last_seen_ms > 0) ? fmtAge(s.now_ms - p.last_seen_ms) : '-';
+      return '<tr class="'+(p.connected?'':'offline')+'">' +
+        '<td>'+dot+' '+crown+escapeHtml(p.name)+'</td>' +
+        '<td>'+p.score+'</td>' +
+        '<td>'+escapeHtml(p.ip)+'</td>' +
+        '<td>'+p.connect_count+'</td>' +
+        '<td>'+age+'</td>' +
+      '</tr>';
+    }).join('');
+  }).catch(function(){});
+}
+
+function refreshLog(){
+  return fetch('/admin/log').then(function(r){return r.json();}).then(function(s){
+    $('logCount').textContent = '('+s.count+' évén.)';
+    if (!s.events || !s.events.length) {
+      $('log').innerHTML = '<div class="meta" style="padding:8px">(aucun événement)</div>';
+      return;
+    }
+    var rev = s.events.slice().reverse();
+    $('log').innerHTML = rev.map(function(e){
+      var age  = fmtAge(s.now_ms - e.ts_ms);
+      var meta = [];
+      if (e.payload) meta.push(escapeHtml(e.payload));
+      if (e.ip)      meta.push(escapeHtml(e.ip));
+      return '<div class="e">' +
+        '<span class="ts">'+age+'</span>' +
+        '<span class="ty '+e.type+'">'+e.type+'</span>' +
+        '<span class="who">'+escapeHtml(e.name||'')+'</span>' +
+        '<span class="meta">'+meta.join(' · ')+'</span>' +
+      '</div>';
+    }).join('');
+  }).catch(function(){});
+}
+
+function refreshAll(){ refreshState(); refreshRoster(); refreshLog(); }
+
+refreshAll();
+setInterval(refreshState,  1500);
+setInterval(refreshRoster, 2500);
+setInterval(refreshLog,    2000);
 </script></body></html>

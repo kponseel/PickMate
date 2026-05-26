@@ -21,6 +21,7 @@
 #include "core/players.h"
 #include "core/flipper_uart.h"
 #include "core/wifi_portal.h"
+#include "core/event_log.h"
 #include "games/game_api.h"
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,21 @@ static const char* phase_str(GamePhase p) {
 // Forward declarations
 static void broadcastState();
 static void sendToFlipper();
+
+// Wraps host_recompute() and emits an EVT_HOST_CHANGE only when the crown
+// actually moves. Call in place of host_recompute() at every join/disconnect.
+static void recompute_host_and_log() {
+    uint32_t prev = host_id;
+    host_recompute();
+    if (host_id != prev) {
+        Player* h = host_get();
+        event_log_record(EVT_HOST_CHANGE, h ? h->name : "", h ? h->ip : 0, "");
+    }
+}
+
+// Convenience: who is the host, for "this action came from the host" log lines.
+static const char* host_name_or_empty() { Player* h = host_get(); return h ? h->name : ""; }
+static uint32_t    host_ip_or_zero()   { Player* h = host_get(); return h ? h->ip   : 0;  }
 
 // Web assets (player SPA + admin panel) live under data/ and are served
 // from LittleFS — see C6 commit and `pio run -t uploadfs`.
@@ -137,16 +153,20 @@ static void onFlipperCommand(const char* cmd) {
         if (strcmp(cmd, "NEXT") == 0 || strcmp(cmd, "START") == 0) {
             if (GAMES_COUNT > 0) {
                 game_select(GAMES[0]);
+                event_log_record(EVT_GAME_SELECT, "flipper", 0, GAMES[0]->id);
                 current_game->on_advance();
+                event_log_record(EVT_GAME_ADVANCE, "flipper", 0, current_game->id);
                 broadcastState();
             }
         }
     } else {
         if (strcmp(cmd, "NEXT") == 0 || strcmp(cmd, "START") == 0) {
             current_game->on_advance();
+            event_log_record(EVT_GAME_ADVANCE, "flipper", 0, current_game->id);
             broadcastState();
         } else if (strcmp(cmd, "RESET") == 0) {
             current_game->on_reset();
+            event_log_record(EVT_GAME_RESET, "flipper", 0, current_game->id);
             broadcastState();
         }
     }
@@ -188,7 +208,8 @@ static void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t le
             p->connect_count++;
             strncpy(p->name, name, MAX_NAME_LEN);
             p->name[MAX_NAME_LEN] = '\0';
-            host_recompute();
+            event_log_record(EVT_PLAYER_JOIN, p->name, p->ip, "");
+            recompute_host_and_log();
             if (current_game && current_game->on_player_join) current_game->on_player_join(p);
             broadcastState();
         }
@@ -198,20 +219,26 @@ static void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t le
             const char* id = doc["id"] | "";
             if (id[0] == '\0') {
                 current_game = nullptr;  // back to hub
+                event_log_record(EVT_GAME_SELECT, host_name_or_empty(), host_ip_or_zero(), "");
             } else {
                 const Game* g = game_find_by_id(id);
-                if (g) game_select(g);
+                if (g) {
+                    game_select(g);
+                    event_log_record(EVT_GAME_SELECT, host_name_or_empty(), host_ip_or_zero(), g->id);
+                }
             }
             broadcastState();
         }
     } else if (strcmp(t, "next") == 0 || strcmp(t, "start") == 0) {
         if (host_is(client->id()) && current_game) {
             current_game->on_advance();
+            event_log_record(EVT_GAME_ADVANCE, host_name_or_empty(), host_ip_or_zero(), current_game->id);
             broadcastState();
         }
     } else if (strcmp(t, "reset") == 0) {
         if (host_is(client->id()) && current_game) {
             current_game->on_reset();
+            event_log_record(EVT_GAME_RESET, host_name_or_empty(), host_ip_or_zero(), current_game->id);
             broadcastState();
         }
     } else if (current_game && current_game->on_message) {
@@ -237,9 +264,12 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client,
     } else if (type == WS_EVT_DISCONNECT) {
         GAME_LOCK();
         Player* p = findPlayer(client->id());
-        if (p) p->last_seen_ms = millis();
+        if (p) {
+            p->last_seen_ms = millis();
+            event_log_record(EVT_PLAYER_LEAVE, p->name, p->ip, "");
+        }
         removePlayer(client->id());
-        host_recompute();
+        recompute_host_and_log();
         if (current_game && current_game->on_player_leave && p) current_game->on_player_leave(p);
         broadcastState();
         GAME_UNLOCK();
@@ -296,8 +326,14 @@ static void setupServer() {
     auto admin_advance = [](AsyncWebServerRequest* req) {
         if (!adminAuth(req)) return;
         GAME_LOCK();
-        if (!current_game && GAMES_COUNT > 0) game_select(GAMES[0]);
-        if (current_game) current_game->on_advance();
+        if (!current_game && GAMES_COUNT > 0) {
+            game_select(GAMES[0]);
+            event_log_record(EVT_GAME_SELECT, "admin", 0, GAMES[0]->id);
+        }
+        if (current_game) {
+            current_game->on_advance();
+            event_log_record(EVT_GAME_ADVANCE, "admin", 0, current_game->id);
+        }
         broadcastState();
         GAME_UNLOCK();
         req->send(200, "text/plain", "ok");
@@ -307,10 +343,51 @@ static void setupServer() {
     server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!adminAuth(req)) return;
         GAME_LOCK();
-        if (current_game) current_game->on_reset();
+        if (current_game) {
+            current_game->on_reset();
+            event_log_record(EVT_GAME_RESET, "admin", 0, current_game->id);
+        }
         broadcastState();
         GAME_UNLOCK();
         req->send(200, "text/plain", "ok");
+    });
+
+    // Event log feed for the admin panel.
+    server.on("/admin/log", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!adminAuth(req)) return;
+        GAME_LOCK();
+        JsonDocument doc;
+        JsonArray arr = doc["events"].to<JsonArray>();
+        event_log_serialize(arr);
+        doc["count"]    = event_log_count();
+        doc["now_ms"]   = millis();
+        GAME_UNLOCK();
+        String out; serializeJson(doc, out);
+        req->send(200, "application/json", out);
+    });
+
+    // Full player roster (history fields included) for the admin panel.
+    server.on("/admin/players", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!adminAuth(req)) return;
+        GAME_LOCK();
+        JsonDocument doc;
+        JsonArray arr = doc["players"].to<JsonArray>();
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (!players[i].name[0]) continue;
+            JsonObject po = arr.add<JsonObject>();
+            po["name"]          = players[i].name;
+            po["score"]         = players[i].score;
+            po["connected"]     = players[i].active;
+            po["host"]          = host_is(players[i].clientId);
+            po["ip"]            = IPAddress(players[i].ip).toString();
+            po["connect_count"] = players[i].connect_count;
+            po["first_seen_ms"] = players[i].first_seen_ms;
+            po["last_seen_ms"]  = players[i].last_seen_ms;
+        }
+        doc["now_ms"] = millis();
+        GAME_UNLOCK();
+        String out; serializeJson(doc, out);
+        req->send(200, "application/json", out);
     });
 
     // Captive-portal probe handling (see CAPTIVE_PORTAL_ENABLED comment above).
