@@ -1,6 +1,8 @@
 #include "game_api.h"
 #include "quiz.h"
 #include "most_likely.h"
+#include "never.h"
+#include "would_rather.h"
 
 #include <string.h>
 
@@ -9,6 +11,8 @@
 const Game* GAMES[] = {
     &QUIZ_GAME,
     &MOST_LIKELY_GAME,
+    &NEVER_GAME,
+    &WOULD_RATHER_GAME,
 };
 int GAMES_COUNT = sizeof(GAMES) / sizeof(GAMES[0]);
 
