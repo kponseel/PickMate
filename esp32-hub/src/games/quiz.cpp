@@ -14,11 +14,31 @@ struct Question {
 };
 
 static const Question QUESTIONS[] = {
-    {"Quelle est la capitale de la France ?",   {"Lyon", "Paris", "Marseille", "Nice"},                       1},
-    {"Combien font 7 x 8 ?",                    {"54", "56", "64", "48"},                                     1},
-    {"Quel gaz les plantes absorbent-elles ?",  {"Oxygene", "Azote", "CO2", "Helium"},                        2},
-    {"Quel est le plus grand ocean ?",          {"Atlantique", "Indien", "Arctique", "Pacifique"},            3},
-    {"Combien de bits dans un octet ?",         {"4", "8", "16", "32"},                                       1},
+    {"Quelle est la capitale de la France ?",                 {"Lyon", "Paris", "Marseille", "Nice"},                      1},
+    {"Combien font 7 x 8 ?",                                  {"54", "56", "64", "48"},                                    1},
+    {"Quel gaz les plantes absorbent-elles ?",                {"Oxygene", "Azote", "CO2", "Helium"},                       2},
+    {"Quel est le plus grand ocean ?",                        {"Atlantique", "Indien", "Arctique", "Pacifique"},           3},
+    {"Combien de bits dans un octet ?",                       {"4", "8", "16", "32"},                                      1},
+    {"Quelle est la capitale de l'Espagne ?",                 {"Lisbonne", "Madrid", "Athenes", "Rome"},                   1},
+    {"Quelle est la plus grosse planete du systeme solaire ?",{"Mars", "Saturne", "Jupiter", "Neptune"},                   2},
+    {"Combien y a-t-il de continents ?",                      {"4", "5", "6", "7"},                                        3},
+    {"Quel animal a le plus long cou ?",                      {"Autruche", "Lama", "Girafe", "Flamant"},                   2},
+    {"Qui a peint la Joconde ?",                              {"Michel-Ange", "Raphael", "Leonard de Vinci", "Picasso"},   2},
+    {"Comment s'appelle un bebe chien ?",                     {"Chaton", "Chiot", "Faon", "Poulain"},                      1},
+    {"Quel est le plus grand desert chaud du monde ?",        {"Gobi", "Kalahari", "Atacama", "Sahara"},                   3},
+    {"En quelle annee est tombe le Mur de Berlin ?",          {"1985", "1989", "1991", "1993"},                            1},
+    {"Combien de touches a un piano classique ?",             {"76", "82", "88", "96"},                                    2},
+    {"Quelle est la monnaie du Japon ?",                      {"Won", "Yuan", "Yen", "Baht"},                              2},
+    {"Quel est le plus haut sommet du monde ?",               {"K2", "Mont Blanc", "Everest", "Kilimandjaro"},             2},
+    {"Quel sport pratique Roger Federer ?",                   {"Golf", "Tennis", "Ski", "Basket"},                         1},
+    {"Combien de joueurs dans une equipe de foot ?",          {"9", "10", "11", "12"},                                     2},
+    {"Quelle est la capitale de l'Australie ?",               {"Sydney", "Melbourne", "Canberra", "Perth"},                2},
+    {"Quel auteur a ecrit 'Les Miserables' ?",                {"Zola", "Hugo", "Balzac", "Dumas"},                         1},
+    {"Combien d'os dans le corps humain adulte ?",            {"186", "206", "256", "306"},                                1},
+    {"Quelle planete a des anneaux celebres ?",               {"Mars", "Jupiter", "Saturne", "Uranus"},                    2},
+    {"Quel est le pays le plus peuple au monde ?",            {"Chine", "Inde", "USA", "Indonesie"},                       1},
+    {"Combien de cotes a un hexagone ?",                      {"5", "6", "7", "8"},                                        1},
+    {"Combien de cordes sur une guitare standard ?",          {"4", "5", "6", "7"},                                        2},
 };
 static const int      QUESTION_COUNT   = sizeof(QUESTIONS) / sizeof(QUESTIONS[0]);
 static const uint32_t QUESTION_TIME_MS = 20000UL;

@@ -13,6 +13,8 @@ static const char* LOCATIONS[] = {
     "Cinema", "Gare", "Hotel", "Camping", "Salle de sport",
     "Centre commercial", "Boulangerie", "Stade", "Theatre", "Foret",
     "Chantier", "Bibliotheque", "Caserne de pompiers", "Sous-marin", "Vol spatial",
+    "Zoo", "Aquarium", "Cathedrale", "Studio TV", "Train de nuit",
+    "Manoir hante", "Salon de coiffure", "Parc d'attractions", "Marche bio", "Aeroport militaire",
 };
 static const int LOCATION_COUNT = sizeof(LOCATIONS) / sizeof(LOCATIONS[0]);
 

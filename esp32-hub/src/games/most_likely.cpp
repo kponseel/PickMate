@@ -18,6 +18,21 @@ static const char* PROMPTS[] = {
     "Qui est le plus susceptible d'envoyer un message a son ex ?",
     "Qui est le plus susceptible de se perdre dans son propre quartier ?",
     "Qui est le plus susceptible de rater son train ?",
+    "Qui est le plus susceptible de tomber amoureux/se en vacances ?",
+    "Qui est le plus susceptible de finir sur scene un jour ?",
+    "Qui est le plus susceptible de mentir sur son age ?",
+    "Qui est le plus susceptible d'oublier son tel quelque part ?",
+    "Qui est le plus susceptible de gagner au loto et tout depenser ?",
+    "Qui est le plus susceptible de devenir vegan ?",
+    "Qui est le plus susceptible de se faire arnaquer en ligne ?",
+    "Qui est le plus susceptible de finir tatoueur ?",
+    "Qui est le plus susceptible d'avoir 5 enfants ?",
+    "Qui est le plus susceptible de divorcer 3 fois ?",
+    "Qui est le plus susceptible de passer un Noel seul a l'autre bout du monde ?",
+    "Qui est le plus susceptible de devenir influenceur/euse ?",
+    "Qui est le plus susceptible de se reveiller en retard a son mariage ?",
+    "Qui est le plus susceptible de finir avec un emploi bizarre (testeur de matelas, mascotte) ?",
+    "Qui est le plus susceptible de croire encore au pere Noel a 30 ans ?",
 };
 static const int PROMPT_COUNT = sizeof(PROMPTS) / sizeof(PROMPTS[0]);
 

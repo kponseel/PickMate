@@ -18,6 +18,16 @@ static const char* TRUTHS[] = {
     "Quel est le dernier mensonge que tu as dit ?",
     "Quel est ton fantasme de vacances ?",
     "A quel age as-tu cru au pere Noel jusqu'a... ?",
+    "Quelle est la chose la plus chere que tu as cassee ?",
+    "Quel est le dernier reve dont tu te souviens ?",
+    "Quel est ton plus gros regret de la derniere annee ?",
+    "Si tu pouvais changer ton prenom, ce serait lequel ?",
+    "Quel est ton plat 'plaisir coupable' ?",
+    "Quel personnage de fiction trouves-tu super attirant ?",
+    "Quelle est la chose la plus bizarre que tu as deja googlee ?",
+    "Quel est ton plus vieux souvenir d'enfance ?",
+    "Combien de temps peux-tu rester sans ton tel ?",
+    "Quelle est ton pire achat compulsif ?",
 };
 static const int TRUTH_COUNT = sizeof(TRUTHS) / sizeof(TRUTHS[0]);
 
@@ -32,6 +42,16 @@ static const char* DARES[] = {
     "Mange/bois un truc en utilisant uniquement ta main faible",
     "Fais un compliment honnete a chaque joueur",
     "Raconte une histoire embarrassante de moins de 30 secondes",
+    "Fais un selfie en grimace et envoie-le a un contact au hasard",
+    "Imite un animal pendant 20 secondes, les autres devinent",
+    "Parle uniquement en chantant pendant 2 tours",
+    "Recite l'alphabet a l'envers le plus vite possible",
+    "Mets-toi en equilibre sur un pied pendant 30 sec",
+    "Joue le role d'un journal televiseé en breaking news pendant 30 sec",
+    "Fais ta meilleure imitation de quelqu'un dans la piece",
+    "Mange une bouchee avec les yeux fermes (un autre choisit)",
+    "Raconte ta journee en utilisant 3 mots tires au hasard du groupe",
+    "Tiens-toi sur la pointe des pieds jusqu'a ton prochain tour",
 };
 static const int DARE_COUNT = sizeof(DARES) / sizeof(DARES[0]);
 

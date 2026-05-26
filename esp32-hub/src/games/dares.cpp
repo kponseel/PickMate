@@ -20,6 +20,16 @@ static const char* DARES[] = {
     "Fais un compliment honnete a chaque joueur",
     "Bois ton verre avec ta main faible jusqu'au prochain tour",
     "Imite quelqu'un dans le groupe, les autres devinent",
+    "Recite l'alphabet a l'envers le plus vite possible",
+    "Fais 5 burpees devant tout le monde",
+    "Parle en yaourt anglais pendant 1 minute",
+    "Fais une publicite pour un objet aleatoire dans la piece",
+    "Pose une question genante a la personne a ta droite",
+    "Raconte une blague vraiment nulle",
+    "Fais comme si tu etais un journaliste en plein direct",
+    "Bouge comme un robot pendant les 2 prochains tours",
+    "Mets-toi a quatre pattes et fais un tour de la piece",
+    "Parle uniquement en chuchotant pendant les 3 prochains tours",
 };
 static const int DARE_COUNT = sizeof(DARES) / sizeof(DARES[0]);
 

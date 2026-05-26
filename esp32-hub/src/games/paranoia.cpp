@@ -23,6 +23,16 @@ static const char* PROMPTS[] = {
     "Qui dans le groupe est le plus mauvais perdant ?",
     "Avec qui ferais-tu equipe pour braquer une banque (hypothetique) ?",
     "Qui est le plus susceptible de finir prof de yoga ?",
+    "Qui as-tu le plus envie de connaitre mieux ?",
+    "Qui ferait le meilleur partenaire d'escape game ?",
+    "Qui dirait le plus de betises sous l'effet de la fatigue ?",
+    "Qui pleure le plus facilement (en bien ou en mal) ?",
+    "Qui as-tu le plus de mal a contredire ?",
+    "Qui ferait le meilleur baby-sitter ?",
+    "Qui te ferait le moins confiance pour cacher un cadeau de surprise ?",
+    "Qui dans le groupe est le plus genereux ?",
+    "Qui ferait le pire prof particulier ?",
+    "Qui aurait le plus de followers sur TikTok si il/elle s'y mettait serieusement ?",
 };
 static const int PROMPT_COUNT = sizeof(PROMPTS) / sizeof(PROMPTS[0]);
 

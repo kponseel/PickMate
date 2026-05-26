@@ -20,6 +20,19 @@ static const char* PROMPTS[] = {
     "Le/la plus probable de monter une startup",
     "Le/la plus loyal(e)",
     "Le/la plus chaotique en soiree",
+    "Le/la plus calin(e)",
+    "Le/la plus accro a son tel",
+    "Le/la plus tete-en-l'air",
+    "Le/la plus sportif/ive",
+    "Le/la plus rapide pour repondre a un message",
+    "Le/la plus susceptible de t'aider a 3h du matin",
+    "Le/la plus mauvais(e) menteur/se",
+    "Le/la plus prevenant(e)",
+    "Le/la plus fanatique d'un sujet bizarre",
+    "Le/la plus susceptible de finir en politique",
+    "Le/la roi/reine des memes",
+    "Le/la plus difficile a reveiller",
+    "Le/la plus apte a survivre en pleine nature",
 };
 static const int PROMPT_COUNT = sizeof(PROMPTS) / sizeof(PROMPTS[0]);
 

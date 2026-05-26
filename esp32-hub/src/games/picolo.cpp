@@ -27,6 +27,18 @@ static const char* PROMPTS[] = {
     "Sondage : sur une echelle de 1 a 10, comment va {p1} ce soir ?",
     "{p1} et {p3} echangent leur pseudo pour les 3 prochains tours",
     "{p1} : explique a {p2} le sens de la vie (30 sec max)",
+    "{p1} et {p2} : duel de regards, perdant bois",
+    "Vote a main levee : qui est le/la plus chaotique ce soir ? Le/la elu·e bois",
+    "{p1} fait un compliment a {p2}, mais en yaourt anglais",
+    "Categorie : films de Tarantino. Premier·e qui rate bois",
+    "Tout le monde change de place avec son voisin de droite",
+    "{p1} : raconte un souvenir d'enfance en 20 sec",
+    "{p1} et {p2} doivent dire la meme phrase EN MEME TEMPS",
+    "{p1} : pose une question chelou aux autres",
+    "Tous les bruns boivent. (Pas de bruns ? {p1} bois)",
+    "{p1} et {p2} : 30 secondes pour inventer une chanson sur le mot 'fromage'",
+    "Avant chaque gorgee : tout le monde doit dire 'sante a {p1}' pendant 5 tours",
+    "Mini-jeu : tour de table, citez un fruit ; premier qui repete ou rate bois",
 };
 static const int PROMPT_COUNT = sizeof(PROMPTS) / sizeof(PROMPTS[0]);
 

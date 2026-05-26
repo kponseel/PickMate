@@ -22,6 +22,17 @@ static const char* PROMPTS[] = {
     "Le motto secret d'un super-mechant timide",
     "Un slogan pour une marque de chaussettes",
     "Une excuse pour ne pas faire la vaisselle",
+    "Le titre d'un film qui ferait fuir au cinema",
+    "Un cri de guerre pour des enfants en colo",
+    "La premiere phrase d'un journal apocalyptique",
+    "Le nom d'un groupe de musique improbable",
+    "La devise d'une ecole de cuisine en deroute",
+    "Le titre d'une theorie du complot ridicule",
+    "Une phrase entendue dans une pub pharmaceutique",
+    "Le pire compliment a faire en speed dating",
+    "Le nom d'un nouveau parfum Yankee Candle",
+    "Une excuse de retard pour un Premier Ministre",
+    "La premiere ligne d'un poeme ecrit par une IA defaillante",
 };
 static const int PROMPT_COUNT = sizeof(PROMPTS) / sizeof(PROMPTS[0]);
 
