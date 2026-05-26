@@ -6,10 +6,10 @@ Dépôt de développement pour le **Flipper Zero** et sa **Wi-Fi Developer Board
 
 | Dossier        | Description |
 |----------------|-------------|
-| [`apps/`](apps/)             | Applications externes Flipper (`.fap`) en C, buildées avec [`ufbt`](https://github.com/flipperdevices/flipperzero-ufbt). Inclut `quiz_master`, le maître du jeu Flipper-Quiz. |
-| [`esp32-quiz/`](esp32-quiz/) | **Flipper-Quiz** : serveur de quiz multijoueur local et hors-ligne pour l'ESP32-S2 (point d'accès Wi-Fi + portail captif + WebSocket). Voir son [README](esp32-quiz/README.md). |
+| [`apps/`](apps/)             | Applications externes Flipper (`.fap`) en C, buildées avec [`ufbt`](https://github.com/flipperdevices/flipperzero-ufbt). Inclut `gameshub`, l'hôte générique de la plateforme. |
+| [`esp32-hub/`](esp32-hub/) | **GamesHub** : plateforme de jeux de soirée multi-téléphone, locale et hors-ligne, pour l'ESP32-S2 (point d'accès Wi-Fi + portail captif + WebSocket). Voir son [README](esp32-hub/README.md). |
 
-> 🚀 **Débutant ?** Suis le [**GUIDE.md**](GUIDE.md) : installation, flash et lancement d'une partie Flipper-Quiz pas-à-pas depuis Windows 11.
+> 🚀 **Débutant ?** Suis le [**GUIDE.md**](GUIDE.md) : installation, flash et lancement d'une partie GamesHub pas-à-pas depuis Windows 11.
 >
 > 🤖 **Tu utilises Claude Code en local ?** Le fichier [**CLAUDE.md**](CLAUDE.md) contient les consignes que Claude lit automatiquement (matériel cible, commandes de flash, pièges).
 
@@ -20,17 +20,17 @@ pip install -U platformio ufbt   # outils (1re fois)
 ufbt update                      # SDK Flipper (1re fois)
 
 # 1) Serveur ESP32 (Wi-Fi Dev Board branchée par son USB)
-cd esp32-quiz
+cd esp32-hub
 pio run -t upload                # flashe le firmware ; "Failed to connect" -> BOOT maintenu + RESET, relâche, relance
 pio run -t uploadfs              # INDISPENSABLE : flashe data/ (page web) sur LittleFS
 
 # 2) App Flipper (FERMER qFlipper d'abord — il verrouille le port)
-cd ..\apps\quiz_master
+cd ..\apps\gameshub
 ufbt launch
 ```
 
 Puis : monte la board sur le Flipper, ouvre **Apps → GPIO → Quiz Master**, connecte un
-téléphone au Wi-Fi **`Flipper-Quiz`**. Pilotage aussi possible via la page **Admin**
+téléphone au Wi-Fi **`Paris - Mini Jeux Gratuits`**. Pilotage aussi possible via la page **Admin**
 (lien en bas de la page joueur → `http://192.168.4.1/admin`, login `admin` / `adminadmin`).
 
 ---
@@ -63,10 +63,10 @@ Applications externes (`.fap`) écrites en C avec l'outil [`ufbt`](https://githu
 │   ├── hello_world/          # App d'exemple minimale (GUI)
 │   │   ├── application.fam   # Manifeste de l'app
 │   │   └── hello_world.c     # Point d'entrée + logique
-│   └── quiz_master/          # Maître du jeu Flipper-Quiz (UART <-> ESP32)
+│   └── gameshub/          # Maître du jeu GamesHub (UART <-> ESP32)
 │       ├── application.fam
-│       └── quiz_master.c
-├── esp32-quiz/               # Serveur de quiz ESP32-S2 (projet séparé)
+│       └── gameshub.c
+├── esp32-hub/               # Serveur de quiz ESP32-S2 (projet séparé)
 ├── CLAUDE.md                 # Consignes projet pour Claude Code (local)
 ├── GUIDE.md                  # Guide débutant pas-à-pas (Windows 11)
 ├── DEBUG_BRIEF.md            # Contexte + protocoles + code complet (debug)

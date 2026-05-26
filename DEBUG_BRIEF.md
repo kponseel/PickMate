@@ -1,9 +1,18 @@
-# DEBUG BRIEF — Flipper-Quiz (ESP32-S2 + Flipper Zero)
+# DEBUG BRIEF — Flipper-Quiz / GamesHub (ESP32-S2 + Flipper Zero)
 
-> Document auto-suffisant. Contexte, protocoles, corrections appliquées, et
-> CODE SOURCE COMPLET (à jour) des deux programmes.
+> ⚠️ **Snapshot historique pré-refacto plateforme (P0).** Ce document fige le
+> code et les protocoles du temps où le repo n'avait qu'un seul jeu (le quiz).
+> Depuis, le projet est devenu **GamesHub** : architecture modulaire avec
+> registre de jeux côté ESP32 et côté client, SPA sur LittleFS, et app Flipper
+> générique. Les morceaux de code embarqués ci-dessous ne sont plus la vérité
+> du repo — voir `esp32-hub/src/` et `apps/gameshub/` pour le courant, ou
+> `HARDWARE.md` pour le brief technique à jour.
 >
-> STATUT : ✅ UART corrigé + durcissement audit + page admin protégée.
+> Le brief reste utile pour : (1) revoir les pièges UART (pins 43/44), (2)
+> comprendre le protocole UART minimal, (3) lire le code original sans
+> abstractions.
+>
+> STATUT pré-refacto : ✅ UART corrigé + durcissement audit + page admin protégée.
 
 ## Objectif du projet
 Quiz multijoueur **local et hors-ligne**. La Wi-Fi Developer Board (ESP32-S2) du

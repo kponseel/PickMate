@@ -1,4 +1,4 @@
-# Guide débutant — Flipper-Quiz (Windows 11)
+# Guide débutant — GamesHub (Windows 11)
 
 Ce guide t'accompagne **de zéro** : installer les outils, flasher la carte Wi-Fi,
 installer l'app Flipper, brancher le tout et lancer une partie de quiz
@@ -10,14 +10,14 @@ multijoueur **sans internet**. Aucune connaissance préalable requise.
 
 Un quiz type « Kahoot » qui marche **hors-ligne**, chez toi :
 
-- La **Wi-Fi Dev Board (ESP32-S2)** crée son propre réseau Wi-Fi `Flipper-Quiz`.
+- La **Wi-Fi Dev Board (ESP32-S2)** crée son propre réseau Wi-Fi `Paris - Mini Jeux Gratuits`.
 - Les joueurs rejoignent ce réseau avec leur **téléphone** → la page du jeu
   s'ouvre toute seule (comme le Wi-Fi d'un hôtel).
 - L'écran du **Flipper Zero** sert de tableau de bord au maître du jeu, qui fait
   défiler les questions avec les boutons physiques.
 
 ```
-Telephones ──Wi-Fi──> ESP32-S2 (reseau "Flipper-Quiz")
+Telephones ──Wi-Fi──> ESP32-S2 (reseau "Paris - Mini Jeux Gratuits")
    (page de jeu)          │
                           └──cable interne──> Flipper Zero (app Quiz Master)
 ```
@@ -112,7 +112,7 @@ cd PickMate
    périphériques** → *Ports (COM et LPT)*.
 3. Compile et téléverse le **firmware** :
    ```powershell
-   cd esp32-quiz
+   cd esp32-hub
    pio run -t upload
    ```
    La première fois, PlatformIO télécharge l'outillage ESP32 (quelques minutes).
@@ -123,7 +123,7 @@ cd PickMate
    ```
    ⚠️ **Indispensable** : sans cette étape, la page joueur sera vide et l'admin
    panel inaccessible. À refaire chaque fois que tu modifies un fichier dans
-   `esp32-quiz/data/` (HTML/CSS/JS).
+   `esp32-hub/data/` (HTML/CSS/JS).
 
 5. **Si un flash échoue** (« Failed to connect », « No serial data received »),
    mets la carte en **mode bootloader** :
@@ -136,12 +136,12 @@ cd PickMate
    ```powershell
    pio device monitor
    ```
-   Tu dois voir une ligne du type `[wifi_portal] AP 'GamesHub' up at 192.168.4.1`
+   Tu dois voir une ligne du type `[wifi_portal] AP 'Paris - Mini Jeux Gratuits' up at 192.168.4.1`
    suivie de `LittleFS mounted (used ... bytes)` et `1 game(s) registered`.
    (Quitte le moniteur avec `Ctrl+C`.)
 
 ✅ À ce stade, même sans le Flipper, tu peux déjà tester : connecte ton téléphone
-au Wi-Fi **Flipper-Quiz** et ouvre la page de jeu. En bas de la page, le lien
+au Wi-Fi **`Paris - Mini Jeux Gratuits`** et ouvre la page de jeu. En bas de la page, le lien
 **« Admin »** ouvre le pupitre du maître du jeu (`http://192.168.4.1/admin`),
 **protégé par mot de passe** :
 
@@ -154,13 +154,13 @@ circule en clair : c'est un simple garde-fou, pas une vraie sécurité.
 
 ---
 
-## 5. Installer l'app Quiz Master sur le Flipper
+## 5. Installer l'app GamesHub sur le Flipper
 
 1. **Ferme qFlipper** s'il est ouvert.
 2. Branche le **Flipper Zero** au PC en USB-C.
 3. Depuis le dossier du projet :
    ```powershell
-   cd ..\apps\quiz_master
+   cd ..\apps\gameshub
    ufbt launch
    ```
    `ufbt launch` **compile**, **installe** l'app sur la carte SD du Flipper, puis
@@ -191,7 +191,7 @@ Plus tard, l'app reste accessible sur le Flipper dans **Apps → GPIO → Quiz M
 1. Sur le Flipper : ouvre **Apps → GPIO → Quiz Master**. L'écran affiche
    `Joueurs: 0` et `Etat: lobby`.
 2. **Joueurs** : sur chaque téléphone, ouvre les réglages Wi-Fi et rejoins le
-   réseau **`Flipper-Quiz`** (réseau ouvert, sans mot de passe). La page du jeu
+   réseau **`Paris - Mini Jeux Gratuits`** (réseau ouvert, sans mot de passe). La page du jeu
    s'ouvre automatiquement.
    - Si elle ne s'ouvre pas : ouvre le navigateur et va sur `http://192.168.4.1`.
 3. Chaque joueur saisit un **pseudo** et appuie sur *Rejoindre*. Le compteur
@@ -240,14 +240,14 @@ Claude ne peut pas appuyer physiquement sur les boutons.
 | `ufbt` : « port occupé / busy » | **Ferme qFlipper** (il garde le port du Flipper). |
 | Pas de port COM | Autre câble USB (certains sont « charge seule »). Vérifie le Gestionnaire de périphériques. |
 | La page ne s'ouvre pas sur le téléphone | Va manuellement sur `http://192.168.4.1`. Désactive les données mobiles. |
-| Flipper affiche `Joueurs: 0` et `Etat: ...` figé | La liaison UART ne passe pas : vérifie que la carte est bien enfichée ; au besoin, adapte `FLIPPER_UART_RX_PIN/TX_PIN` dans `esp32-quiz/src/main.cpp`. |
+| Flipper affiche `Joueurs: 0` et `Etat: ...` figé | La liaison UART ne passe pas : vérifie que la carte est bien enfichée ; au besoin, adapte `FLIPPER_UART_RX_PIN/TX_PIN` dans `esp32-hub/src/main.cpp`. |
 | Erreur de build `ufbt` après MAJ Flipper | Relance `ufbt update`. |
 
 ---
 
 ## 10. Personnaliser les questions
 
-Édite le tableau `QUESTIONS[]` dans `esp32-quiz/src/main.cpp` (chaque ligne :
+Édite le tableau `QUESTIONS[]` dans `esp32-hub/src/main.cpp` (chaque ligne :
 texte, 4 réponses, index de la bonne réponse de 0 à 3), puis re-flashe avec
 `pio run -t upload`.
 

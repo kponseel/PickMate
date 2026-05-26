@@ -92,7 +92,7 @@ furi_hal_serial_control_release(serial);
 
 Le callback RX tourne en **interrupt context** : il faut juste pousser l'octet dans
 un `FuriStreamBuffer` et faire le parsing dans un thread dédié (voir
-`apps/quiz_master/quiz_master.c` pour l'exemple complet).
+`apps/gameshub/gameshub.c` pour l'exemple complet).
 
 `application.fam` minimal :
 ```python
@@ -146,7 +146,7 @@ Pour les jeux futurs : garde ce pattern, ça évite plein de race conditions.
 
 4. **Le devboard ne s'allume pas si la batterie du Flipper est trop basse** —
    Au début c'était notre cas et on a confondu ça avec un défaut UART. Si le
-   Wi-Fi `Flipper-Quiz` ne broadcast pas, **charge le Flipper d'abord 30 min**
+   Wi-Fi `Paris - Mini Jeux Gratuits` ne broadcast pas, **charge le Flipper d'abord 30 min**
    ou alimente le devboard par son propre USB-C en exploitation.
 
 5. **Le port COM de l'ESP32 disparaît après chaque flash** — Normal sur S2 USB
@@ -161,7 +161,7 @@ Pour les jeux futurs : garde ce pattern, ça évite plein de race conditions.
    ```
 
 7. **Captive portal vs warning "pas d'internet"** — C'est un choix UX, pas un
-   bug. Voir `CAPTIVE_PORTAL_ENABLED` dans `esp32-quiz/src/main.cpp` :
+   bug. Voir `CAPTIVE_PORTAL_ENABLED` dans `esp32-hub/src/main.cpp` :
    - `true` (défaut) → la page s'ouvre auto sur les téléphones, mais Android
      affiche "pas d'accès Internet" et risque de déconnecter.
    - `false` (stealth) → on répond aux probes de connectivité (Android
@@ -171,7 +171,7 @@ Pour les jeux futurs : garde ce pattern, ça évite plein de race conditions.
 
 ## 7. Bootstrapping un nouveau jeu
 
-1. **Fork le repo** (ou copie `esp32-quiz/` et `apps/quiz_master/` dans un nouveau).
+1. **Fork le repo** (ou copie `esp32-hub/` et `apps/gameshub/` dans un nouveau).
 2. **Côté ESP32** : remplace la logique `QUESTIONS[]`, `gameState`, `advance()`,
    etc. par celle de ton jeu. Garde `setup()`, `loop()`, le bloc `setupServer()`
    et `sendToFlipper()` comme socle.
@@ -185,7 +185,7 @@ Pour les jeux futurs : garde ce pattern, ça évite plein de race conditions.
 
 ## 8. Tests de diagnostic rapides
 
-- **L'ESP32 boote ?** → SSID `Flipper-Quiz` (ou ton nom custom) visible dans la
+- **L'ESP32 boote ?** → SSID `Paris - Mini Jeux Gratuits` (ou ton nom custom) visible dans la
   liste Wi-Fi d'un téléphone, sous 5 secondes.
 - **Le web server répond ?** → `http://192.168.4.1/` charge la page, ou
   `/admin/reset` renvoie `ok`.
@@ -227,5 +227,5 @@ Pour les jeux futurs : garde ce pattern, ça évite plein de race conditions.
 4. Ferme qFlipper avant `ufbt`.
 5. Protocole texte ligne-à-ligne, push d'état complet à chaque évènement.
 
-Le code de `esp32-quiz/src/main.cpp` et `apps/quiz_master/quiz_master.c` est un
+Le code de `esp32-hub/src/main.cpp` et `apps/gameshub/gameshub.c` est un
 exemple complet directement réutilisable.

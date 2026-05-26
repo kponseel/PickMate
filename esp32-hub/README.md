@@ -1,4 +1,4 @@
-# Flipper-Quiz — serveur ESP32-S2
+# GamesHub — serveur ESP32-S2
 
 Quiz multijoueur **local et hors-ligne** pour la Wi-Fi Developer Board (ESP32-S2).
 L'ESP32 crée son propre point d'accès, ouvre automatiquement l'interface de jeu
@@ -12,13 +12,13 @@ via WebSocket. Le maître du jeu fait défiler les questions depuis le Flipper Z
 ## Architecture
 
 ```
-Smartphones ──Wi-Fi──> ESP32-S2 (AP "Flipper-Quiz", 192.168.4.1)
+Smartphones ──Wi-Fi──> ESP32-S2 (AP "Paris - Mini Jeux Gratuits", 192.168.4.1)
    (UI web /ws)          │  captive portal + serveur web + WebSocket + jeu
                          │
                          └──UART──> Flipper Zero (.fap)  ← maître du jeu
 ```
 
-- **AP Wi-Fi ouvert** : `Flipper-Quiz`
+- **AP Wi-Fi ouvert** : `Paris - Mini Jeux Gratuits` (configurable dans `src/main.cpp`)
 - **Portail captif** : DNS « catch-all » + redirection HTTP → la page s'ouvre seule
 - **UI joueur** : `index.html` embarqué (HTML/CSS/JS en un seul fichier, vanilla JS)
 - **Temps réel** : WebSocket `/ws` (JSON)
@@ -29,7 +29,7 @@ Smartphones ──Wi-Fi──> ESP32-S2 (AP "Flipper-Quiz", 192.168.4.1)
 Avec [PlatformIO](https://platformio.org/) :
 
 ```bash
-cd esp32-quiz
+cd esp32-hub
 pio run                 # compile
 pio run -t upload       # flashe l'ESP32 connecté en USB
 pio device monitor      # logs série (115200)
@@ -44,12 +44,12 @@ Si ta carte n'est pas une ESP32-S2 Saola générique, ajuste `board` dans
 ## Jouer
 
 1. Flashe l'ESP32 et alimente-le.
-2. Sur les téléphones : rejoindre le Wi-Fi **Flipper-Quiz** → la page de jeu
+2. Sur les téléphones : rejoindre le Wi-Fi **`Paris - Mini Jeux Gratuits`** → la page de jeu
    s'ouvre seule (sinon, aller sur `http://192.168.4.1`).
 3. Chaque joueur saisit un pseudo.
 4. Le maître lance et fait avancer la partie :
    - via le Flipper (bouton **OK** = suivant, **Bas** = reset) — app
-     [`apps/quiz_master`](../apps/quiz_master/), ou
+     [`apps/gameshub`](../apps/gameshub/), ou
    - via un navigateur : `http://192.168.4.1/admin/next` (démarrer / question
      suivante / révéler) et `/admin/reset` (recommencer).
 

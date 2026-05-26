@@ -1,6 +1,6 @@
 /*
- * GamesHub (was Flipper-Quiz) — local, offline multiplayer party-game server
- * for the ESP32-S2 Wi-Fi Developer Board clipped onto a Flipper Zero.
+ * GamesHub — local, offline multiplayer party-game platform for the ESP32-S2
+ * Wi-Fi Developer Board clipped onto a Flipper Zero.
  *
  * The ESP32 opens an open Wi-Fi access point, runs a captive portal so phones
  * auto-open the hub UI, serves the embedded SPA, and synchronises the game
@@ -28,7 +28,7 @@
 // ---------------------------------------------------------------------------
 
 // Wi-Fi network name shown on phones.
-static const char* AP_SSID = "Flipper-Quiz";
+static const char* AP_SSID = "Paris - Mini Jeux Gratuits";
 
 // Optional Wi-Fi password (>= 8 chars). Set to NULL for an OPEN network.
 static const char* AP_PASS = NULL;
