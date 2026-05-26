@@ -4,10 +4,12 @@
 //   mount(area, helpers)   - called once when entering the game
 //   render(state, helpers) - called on every state push
 //   unmount(area, helpers) - optional, called when leaving the game
+//
+// State source of truth = the server. We do NOT keep a local "did I vote"
+// flag because page-refresh would lose it; instead we read findMe().answered
+// from the most recent state push.
 
 (function () {
-  var lastAnswerChoice = -1;
-
   function build(area, h) {
     area.innerHTML =
       '<div class="screen on" id="q-question">' +
@@ -32,16 +34,15 @@
         '<button class="primary" id="quizResetBtn" style="display:none">Recommencer</button>' +
       '</div>';
 
-    lastAnswerChoice = -1;
-
     for (var i = 0; i < 4; i++) {
       (function (idx) {
         h.$("b" + idx).onclick = function () {
-          if (lastAnswerChoice >= 0) return;
-          lastAnswerChoice = idx;
-          h.send({ t: "answer", choice: idx });
+          var me = h.findMe();
+          if (me && me.answered) return;
+          // Optimistic lock: disable immediately, next state push confirms.
           for (var j = 0; j < 4; j++) h.$("b" + j).disabled = true;
           h.$("qStatus").textContent = "Reponse envoyee, attends les autres...";
+          h.send({ t: "answer", choice: idx });
         };
       })(i);
     }
@@ -57,11 +58,13 @@
   }
 
   function renderState(state, h) {
-    var r = state.round || {};
+    var r  = state.round || {};
+    var me = h.findMe();
+
     if (state.phase === "playing") {
       showQuizScreen(h, "q-question");
       h.$("qText").textContent = "(" + ((r.idx || 0) + 1) + "/" + (r.total || "?") + ") " + (r.q || "");
-      var locked = lastAnswerChoice >= 0;
+      var locked = !!(me && me.answered);
       for (var i = 0; i < 4; i++) {
         var b = h.$("b" + i);
         b.textContent = (r.options && r.options[i]) || "";
@@ -73,13 +76,11 @@
     } else if (state.phase === "reveal") {
       showQuizScreen(h, "q-reveal");
       var correct = r.correct;
-      var me = h.findMe();
-      var ok = (lastAnswerChoice === correct);
+      var ok      = !!(me && me.answered && me.answer === correct);
       h.$("myScore").textContent = me ? me.score : 0;
-      h.$("revealMark").innerHTML = ok ? "&#9989;" : "&#10067;";
+      h.$("revealMark").innerHTML = ok ? "&#9989;" : (me && me.answered ? "&#10060;" : "&#10067;");
       h.$("revealMsg").textContent = "Bonne reponse : " + ["A", "B", "C", "D"][correct];
       h.$("quizNextBtn").style.display = h.amHost() ? "block" : "none";
-      lastAnswerChoice = -1;
     } else if (state.phase === "finished") {
       showQuizScreen(h, "q-end");
       var ol = h.$("board"); ol.innerHTML = "";
@@ -92,14 +93,13 @@
         ol.appendChild(li);
       });
       h.$("quizResetBtn").style.display = h.amHost() ? "block" : "none";
-      lastAnswerChoice = -1;
     }
   }
 
   window.GamesHub.register("quiz", {
-    name:  "Quiz",
-    emoji: "🧠",  // 🧠
-    desc:  "Questions a choix multiples, score chrono.",
+    name:   "Quiz",
+    emoji:  "🧠",
+    desc:   "Questions a choix multiples, score chrono.",
     mount:  build,
     render: renderState
   });

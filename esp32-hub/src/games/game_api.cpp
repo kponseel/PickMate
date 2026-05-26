@@ -1,5 +1,6 @@
 #include "game_api.h"
 #include "quiz.h"
+#include "most_likely.h"
 
 #include <string.h>
 
@@ -7,6 +8,7 @@
 // is the order shown to players.
 const Game* GAMES[] = {
     &QUIZ_GAME,
+    &MOST_LIKELY_GAME,
 };
 int GAMES_COUNT = sizeof(GAMES) / sizeof(GAMES[0]);
 

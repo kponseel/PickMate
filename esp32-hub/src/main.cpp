@@ -119,6 +119,11 @@ static void broadcastState() {
         po["connect_count"] = players[i].connect_count;
         po["first_seen_ms"] = players[i].first_seen_ms;
         po["last_seen_ms"]  = players[i].last_seen_ms;
+        // Reusable per-round acting state for any "act once per round" game
+        // (quiz answer, most_likely vote, never response, etc.). Modules clear
+        // these in their on_start hook for each new round.
+        po["answered"]      = players[i].answered;
+        if (players[i].answered) po["answer"] = players[i].answer;
     }
 
     JsonObject round = doc["round"].to<JsonObject>();
