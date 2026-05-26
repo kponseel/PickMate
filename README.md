@@ -10,6 +10,27 @@ Dépôt de développement pour le **Flipper Zero** et sa **Wi-Fi Developer Board
 | [`esp32-quiz/`](esp32-quiz/) | **Flipper-Quiz** : serveur de quiz multijoueur local et hors-ligne pour l'ESP32-S2 (point d'accès Wi-Fi + portail captif + WebSocket). Voir son [README](esp32-quiz/README.md). |
 
 > 🚀 **Débutant ?** Suis le [**GUIDE.md**](GUIDE.md) : installation, flash et lancement d'une partie Flipper-Quiz pas-à-pas depuis Windows 11.
+>
+> 🤖 **Tu utilises Claude Code en local ?** Le fichier [**CLAUDE.md**](CLAUDE.md) contient les consignes que Claude lit automatiquement (matériel cible, commandes de flash, pièges).
+
+## Démarrage rapide (Windows 11, PowerShell)
+
+```powershell
+pip install -U platformio ufbt   # outils (1re fois)
+ufbt update                      # SDK Flipper (1re fois)
+
+# 1) Serveur ESP32 (Wi-Fi Dev Board branchée par son USB)
+cd esp32-quiz
+pio run -t upload                # flashe ; "Failed to connect" -> BOOT maintenu + RESET, relâche, relance
+
+# 2) App Flipper (FERMER qFlipper d'abord — il verrouille le port)
+cd ..\apps\quiz_master
+ufbt launch
+```
+
+Puis : monte la board sur le Flipper, ouvre **Apps → GPIO → Quiz Master**, connecte un
+téléphone au Wi-Fi **`Flipper-Quiz`**. Pilotage aussi possible via la page **Admin**
+(lien en bas de la page joueur → `http://192.168.4.1/admin`, login `admin` / `adminadmin`).
 
 ---
 
@@ -45,7 +66,9 @@ Applications externes (`.fap`) écrites en C avec l'outil [`ufbt`](https://githu
 │       ├── application.fam
 │       └── quiz_master.c
 ├── esp32-quiz/               # Serveur de quiz ESP32-S2 (projet séparé)
+├── CLAUDE.md                 # Consignes projet pour Claude Code (local)
 ├── GUIDE.md                  # Guide débutant pas-à-pas (Windows 11)
+├── DEBUG_BRIEF.md            # Contexte + protocoles + code complet (debug)
 └── README.md
 ```
 
