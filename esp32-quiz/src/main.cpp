@@ -15,6 +15,8 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
+#include "core/players.h"
+
 // ---------------------------------------------------------------------------
 // User-configurable settings — edit these to your taste, then re-flash.
 // ---------------------------------------------------------------------------
@@ -49,8 +51,6 @@ static const byte DNS_PORT = 53;
 #define FLIPPER_UART_TX_PIN 43  // -> Flipper pin 14 (RX)
 #define FLIPPER_UART_BAUD   115200
 
-#define MAX_PLAYERS        16
-#define MAX_NAME_LEN       16
 #define QUESTION_TIME_MS   20000UL
 #define AP_MAX_CONN        8    // ESP32 SoftAP practical limit (~8 phones)
 
@@ -82,17 +82,7 @@ static const int QUESTION_COUNT = sizeof(QUESTIONS) / sizeof(QUESTIONS[0]);
 // ---------------------------------------------------------------------------
 enum GameState { LOBBY, QUESTION, REVEAL, FINISHED };
 
-struct Player {
-    bool     active;
-    uint32_t clientId;
-    char     name[MAX_NAME_LEN + 1];
-    uint32_t score;
-    bool     answered;
-    uint8_t  answer;
-    uint32_t answerMs;
-};
-
-static Player    players[MAX_PLAYERS];
+// players[] now lives in core/players.cpp (see core/players.h).
 static GameState gameState        = LOBBY;
 static int       currentQuestion  = -1;
 static uint32_t  questionStartMs  = 0;
@@ -280,55 +270,8 @@ setInterval(refresh,1500);refresh();
 </script></body></html>)HTML";
 
 // ---------------------------------------------------------------------------
-// Player helpers
+// Quiz-specific helpers (still here pending C5 extraction into a game module)
 // ---------------------------------------------------------------------------
-static Player* findPlayer(uint32_t clientId) {
-    for (int i = 0; i < MAX_PLAYERS; i++)
-        if (players[i].active && players[i].clientId == clientId) return &players[i];
-    return nullptr;
-}
-
-// A disconnected slot with the same name: lets a reconnecting phone reclaim its
-// score instead of starting over.
-static Player* findReconnectSlot(const char* name) {
-    for (int i = 0; i < MAX_PLAYERS; i++)
-        if (!players[i].active && players[i].name[0] &&
-            strncmp(players[i].name, name, MAX_NAME_LEN) == 0)
-            return &players[i];
-    return nullptr;
-}
-
-static Player* addPlayer(uint32_t clientId) {
-    int reuse = -1;
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (!players[i].active && players[i].name[0] == '\0') {  // prefer a truly empty slot
-            players[i] = Player{};
-            players[i].active   = true;
-            players[i].clientId = clientId;
-            return &players[i];
-        }
-        if (!players[i].active && reuse < 0) reuse = i;  // else evict a disconnected ghost
-    }
-    if (reuse >= 0) {
-        players[reuse] = Player{};
-        players[reuse].active   = true;
-        players[reuse].clientId = clientId;
-        return &players[reuse];
-    }
-    return nullptr;
-}
-
-static void removePlayer(uint32_t clientId) {
-    Player* p = findPlayer(clientId);
-    if (p) p->active = false;  // keep name+score so the player can reconnect
-}
-
-static int activeCount() {
-    int n = 0;
-    for (int i = 0; i < MAX_PLAYERS; i++) if (players[i].active && players[i].name[0]) n++;
-    return n;
-}
-
 static bool allAnswered() {
     for (int i = 0; i < MAX_PLAYERS; i++)
         if (players[i].active && players[i].name[0] && !players[i].answered) return false;
