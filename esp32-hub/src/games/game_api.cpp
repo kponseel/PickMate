@@ -3,6 +3,8 @@
 #include "most_likely.h"
 #include "never.h"
 #include "would_rather.h"
+#include "truth_dare.h"
+#include "superlatives.h"
 
 #include <string.h>
 
@@ -13,6 +15,8 @@ const Game* GAMES[] = {
     &MOST_LIKELY_GAME,
     &NEVER_GAME,
     &WOULD_RATHER_GAME,
+    &TRUTH_DARE_GAME,
+    &SUPERLATIVES_GAME,
 };
 int GAMES_COUNT = sizeof(GAMES) / sizeof(GAMES[0]);
 
