@@ -1,0 +1,11 @@
+App(
+    appid="gameshub",
+    name="GamesHub",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="gameshub_app",
+    stack_size=4 * 1024,
+    fap_category="GPIO",
+    fap_author="kponseel",
+    fap_version="1.0",
+    fap_description="Host controller for the GamesHub ESP32 party-game platform (UART).",
+)
