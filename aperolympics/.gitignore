@@ -1,0 +1,15 @@
+# deps
+node_modules/
+
+# env / secrets
+.env
+
+# logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

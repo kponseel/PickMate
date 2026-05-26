@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Aperolympics</title>
+  <meta name="theme-color" content="#0f1020" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Aperolympics" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon.svg" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header><h1>🍹 Aperolympics</h1><div class="sub" id="status">Connexion…</div></header>
+  <main>
+    <!-- Landing: create or join a room -->
+    <section class="screen on" id="s-join">
+      <input id="name" placeholder="Ton pseudo" maxlength="16" autocomplete="off" />
+      <button class="primary" id="createBtn">Créer une partie</button>
+      <div class="or">— ou —</div>
+      <input id="code" placeholder="Code de partie (ex: ABCD)" maxlength="6" autocomplete="off" autocapitalize="characters" />
+      <button id="joinBtn">Rejoindre</button>
+      <div class="center error" id="joinError"></div>
+    </section>
+
+    <!-- Hub: host picks an épreuve -->
+    <section class="screen" id="s-hub">
+      <div class="roombadge" id="hubRoom"></div>
+      <div class="players" id="hubPlayers"></div>
+      <div class="center muted" id="hubHint"></div>
+      <div class="game-list" id="gameList"></div>
+    </section>
+
+    <!-- Lobby: waiting room for the chosen game -->
+    <section class="screen" id="s-lobby">
+      <div class="roombadge" id="lobbyRoom"></div>
+      <div class="lobby-head"><span class="big" id="lobbyEmoji"></span><h2 id="lobbyName"></h2></div>
+      <div class="rules" id="lobbyRules"></div>
+      <div class="players" id="lobbyPlayers"></div>
+      <div class="center muted" id="lobbyHint"></div>
+      <button class="primary" id="startBtn" style="display:none">Démarrer</button>
+      <button id="backToHubBtn" style="display:none">← Changer d'épreuve</button>
+    </section>
+
+    <!-- Active game renderer mounts here -->
+    <section class="screen" id="game-area"></section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+  <!-- One <script> per game renderer. Add the other 15 here. -->
+  <script src="/games/quiz.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/sw.js").catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>

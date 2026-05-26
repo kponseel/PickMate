@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Aperolympics">
+  <rect width="512" height="512" rx="104" fill="#0f1020"/>
+  <path d="M196 116 L262 286 L206 308 L150 168 Z" fill="#5b6cff"/>
+  <path d="M316 116 L250 286 L306 308 L362 168 Z" fill="#e6394a"/>
+  <circle cx="256" cy="330" r="120" fill="#ffd23f" stroke="#e0b400" stroke-width="10"/>
+  <circle cx="256" cy="330" r="94" fill="#ffe07a"/>
+  <path fill="#e0b400" d="M256 272 L270 311 L311 312 L279 337 L290 377 L256 354 L222 377 L233 337 L201 312 L242 311 Z"/>
+</svg>
