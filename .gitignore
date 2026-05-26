@@ -26,3 +26,9 @@ compile_commands.json
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
