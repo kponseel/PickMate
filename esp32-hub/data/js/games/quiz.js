@@ -100,6 +100,9 @@
     name:   "Quiz",
     emoji:  "🧠",
     desc:   "Questions a choix multiples, score chrono.",
+    rules:  "Une question + 4 options <b>A/B/C/D</b>. Tape la bonne reponse <b>le plus vite possible</b>.<br>" +
+            "Score = 500 pts + bonus chrono (plus tu reponds tot, plus tu marques).<br>" +
+            "L'hote 👑 (ou le bouton OK du Flipper) avance entre chaque question.",
     mount:  build,
     render: renderState
   });

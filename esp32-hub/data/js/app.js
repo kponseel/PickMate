@@ -78,6 +78,12 @@ window.GamesHub.register = function (id, def) { this.games[id] = def; };
     var g = window.GamesHub.games[state.game];
     $("lobbyEmoji").textContent = g ? g.emoji : "";
     $("lobbyName").textContent  = g ? g.name  : "";
+    // Rules card — let players read how the game works while they wait.
+    if ($("lobbyRules")) {
+      $("lobbyRules").innerHTML = (g && g.rules)
+        ? '<h4>📖 Comment jouer</h4>' + g.rules
+        : '';
+    }
     renderPlayerChips("lobbyPlayers");
     var iAmHost = amHost();
     $("startBtn").style.display      = iAmHost ? "block" : "none";

@@ -85,6 +85,9 @@
     name:   "Superlatifs",
     emoji:  "🏆",
     desc:   "Vote secret : qui est le/la plus X du groupe ?",
+    rules:  "Variante de \"Le plus susceptible\" mais avec des <b>categories</b> : drole, style, organise, voyageur...<br>" +
+            "Vote secret pour le/la plus <b>X du groupe</b>.<br>" +
+            "Reveal sous forme de <b>podium</b> 🥇🥈🥉 avec les compteurs.",
     mount:  build,
     render: render
   });

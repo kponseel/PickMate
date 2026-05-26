@@ -108,6 +108,11 @@
     name:   "Undercover",
     emoji:  "🕵️",
     desc:   "Mot secret different pour l'intrus. Trouvez-le ! (3 joueurs min)",
+    rules:  "<b>3+ joueurs.</b> Chacun recoit un <b>mot prive</b> sur son tel.<br>" +
+            "La <b>majorite</b> partage le meme mot, mais <b>1-2 undercover</b> (selon la taille du groupe) ont un mot <b>proche mais different</b>.<br>" +
+            "<b>1.</b> A l'oral, chacun decrit son mot en <b>quelques mots</b> (sans le dire direct).<br>" +
+            "<b>2.</b> Apres discussion, vote pour qui tu penses etre l'intrus.<br>" +
+            "Civils gagnent si l'undercover est demasque, sinon l'undercover gagne.",
     mount:  build,
     render: render
   });

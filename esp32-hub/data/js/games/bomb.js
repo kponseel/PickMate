@@ -81,6 +81,11 @@
     name:   "La Bombe",
     emoji:  "💣",
     desc:   "Patate chaude avec timer cache. Refile-la !",
+    rules:  "Une <b>bombe virtuelle</b> circule entre les tels.<br>" +
+            "<b>Timer cache</b> de 20 a 60 secondes — personne ne sait quand ca explose.<br>" +
+            "Si tu as la bombe : tape sur le nom d'un autre joueur pour <b>la lui passer</b>.<br>" +
+            "<b>BOOM</b> quand le timer atteint 0 : celui qui la tient <b>perd la manche</b> (compteur 💥).<br>" +
+            "L'hote relance un nouveau round.",
     mount:  build,
     render: render
   });

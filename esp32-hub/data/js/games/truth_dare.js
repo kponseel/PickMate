@@ -75,6 +75,11 @@
     name:   "Action ou Verite",
     emoji:  "🎭",
     desc:   "Tour par tour : verite ou gage, prompts piochés au hasard.",
+    rules:  "Action ou Verite, en <b>tour rotatif</b>.<br>" +
+            "<b>1.</b> Un joueur est mis en avant (les autres voient \"C'est au tour de X\").<br>" +
+            "<b>2.</b> Il/elle choisit <b>🤐 Verite</b> (question) ou <b>😤 Action</b> (gage).<br>" +
+            "<b>3.</b> Le prompt est tire au hasard et s'affiche pour tout le monde.<br>" +
+            "<b>4.</b> Quand c'est fait, le joueur clique <b>Fait !</b> et on passe au suivant.",
     mount:  build,
     render: render
   });

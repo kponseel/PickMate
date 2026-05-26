@@ -79,6 +79,10 @@
     name:   "Je n'ai jamais",
     emoji:  "🙊",
     desc:   "Anonyme : j'ai deja ou jamais ? On voit le score.",
+    rules:  "Une phrase \"Je n'ai jamais...\" s'affiche.<br>" +
+            "Chacun choisit <b>J'ai deja</b> ou <b>Jamais</b>.<br>" +
+            "Le reveal montre uniquement les <b>compteurs</b> (totalement anonyme, sans nom).<br>" +
+            "Le but : ambiance, decouvertes, et tu bois quand t'as deja fait 😉.",
     mount:  build,
     render: render
   });

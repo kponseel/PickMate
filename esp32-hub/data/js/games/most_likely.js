@@ -88,6 +88,9 @@
     name:   "Le plus susceptible",
     emoji:  "😈",
     desc:   "Vote secret : qui est le plus susceptible de... ?",
+    rules:  "<b>Vote secret</b> : qui dans le groupe colle le mieux a la phrase \"Qui est le plus susceptible de...\" ?<br>" +
+            "Tout le monde vote <b>en meme temps</b>, sans voir les autres choix.<br>" +
+            "Le reveal montre le classement complet des votes par personne.",
     mount:  build,
     render: render
   });

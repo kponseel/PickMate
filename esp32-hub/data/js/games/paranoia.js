@@ -97,6 +97,11 @@
     name:   "Paranoia",
     emoji:  "👀",
     desc:   "Question secrete a une personne. Le doigt parle... le coin decide.",
+    rules:  "<b>1.</b> Un seul joueur recoit une <b>question privee</b> sur son tel (les autres ne voient rien).<br>" +
+            "<b>2.</b> Il/elle pointe discretement la personne qui colle le mieux a la question.<br>" +
+            "<b>3.</b> Tout le groupe voit <b>qui</b> a ete pointe — sans savoir pourquoi.<br>" +
+            "<b>4.</b> Le <b>coin 🪙</b> est tire : 50% chance que la question soit revelee, 50% qu'elle reste mystere.<br>" +
+            "Tour rotatif. Reste paranoiaque ! 👀",
     mount:  build,
     render: render
   });
