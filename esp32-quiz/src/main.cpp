@@ -301,6 +301,7 @@ static void broadcastLobby() {
     JsonDocument doc;
     doc["type"]    = "lobby";
     doc["players"] = activeCount();
+    doc["hostId"]  = host_id;
     String out; serializeJson(doc, out);
     ws.textAll(out);
 }
@@ -410,6 +411,8 @@ static void advance() {
 static void sendToFlipper() {
     flipper_uart_printf("PLAYERS:%d\n", activeCount());
     flipper_uart_printf("STATE:%s\n", stateName());
+    Player* h = host_get();
+    flipper_uart_printf("HOST:%s\n", h ? h->name : "");
     if (gameState == QUESTION || gameState == REVEAL)
         flipper_uart_printf("Q:%d/%d\n", currentQuestion + 1, QUESTION_COUNT);
 }
@@ -442,7 +445,10 @@ static void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t le
             strncpy(p->name, name, MAX_NAME_LEN);
             p->name[MAX_NAME_LEN] = '\0';
 
+            host_recompute();
+
             JsonDocument ack; ack["type"] = "joined";
+            ack["host"] = host_is(client->id());
             String out; serializeJson(ack, out);
             client->text(out);
 
@@ -473,6 +479,7 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client,
     if (type == WS_EVT_DISCONNECT) {
         GAME_LOCK();
         removePlayer(client->id());
+        host_recompute();
         broadcastLobby();
         sendToFlipper();
         GAME_UNLOCK();

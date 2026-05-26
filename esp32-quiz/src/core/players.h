@@ -43,3 +43,25 @@ void removePlayer(uint32_t clientId);
 
 // Number of players currently active *with* a non-empty name.
 int activeCount();
+
+// -----------------------------------------------------------------------------
+// Host election
+// -----------------------------------------------------------------------------
+// The "host" (👑) is the active player with the smallest clientId. The smallest
+// id is stable, deterministic, and naturally re-elected when the current host
+// leaves: a single rescan after each join/disconnect is enough.
+//
+// Per H6: only the host is allowed to start/advance/reset the game and pick
+// the next game from the hub. The Flipper buttons and the /admin HTTP endpoints
+// bypass this gate (they're explicitly the game master's controls).
+
+extern uint32_t host_id;  // 0 means "no host yet" (empty lobby)
+
+// Rescan the roster and update host_id. Call after every join/disconnect.
+void host_recompute();
+
+// Pointer to the current host Player, or nullptr if the lobby is empty.
+Player* host_get();
+
+// Convenience: true when this WS client owns the crown.
+bool host_is(uint32_t clientId);

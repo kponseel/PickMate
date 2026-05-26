@@ -47,3 +47,28 @@ int activeCount() {
     for (int i = 0; i < MAX_PLAYERS; i++) if (players[i].active && players[i].name[0]) n++;
     return n;
 }
+
+uint32_t host_id = 0;
+
+void host_recompute() {
+    uint32_t best  = 0;
+    bool     found = false;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (players[i].active && players[i].name[0]) {
+            if (!found || players[i].clientId < best) {
+                best  = players[i].clientId;
+                found = true;
+            }
+        }
+    }
+    host_id = found ? best : 0;
+}
+
+Player* host_get() {
+    if (host_id == 0) return nullptr;
+    return findPlayer(host_id);
+}
+
+bool host_is(uint32_t clientId) {
+    return host_id != 0 && clientId == host_id;
+}
