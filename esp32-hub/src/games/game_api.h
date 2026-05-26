@@ -45,6 +45,14 @@ struct Game {
     void (*serialize_round)(JsonObject round);                   // fill the "round" field of the state push
     void (*flipper_progress)(char* out, size_t cap);             // PROGRESS:<text> line for the Flipper display
 
+    // Per-client private payload (optional, may be NULL). If set, the core
+    // calls this once per connected player just after broadcastState() and
+    // pushes a separate {t:"private",round:{...}} message to that client
+    // alone. Use it for secrets that other phones must NOT see (the asker's
+    // question in paranoia, the player's role/word in undercover/spyfall…).
+    // Leave the JsonObject empty to skip a given viewer.
+    void (*serialize_private)(const Player* viewer, JsonObject out);
+
     // Periodic tick (timers, bombs, etc.). Returns true if state changed and
     // the core should broadcast. Called every loop iteration.
     bool (*tick)(uint32_t now_ms);

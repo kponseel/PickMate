@@ -149,5 +149,6 @@ const Game WOULD_RATHER_GAME = {
     /* phase           */ phase_impl,
     /* serialize_round */ serialize_round_impl,
     /* flipper_progress*/ flipper_progress_impl,
+    /* serialize_private*/ nullptr,
     /* tick            */ tick_impl,
 };

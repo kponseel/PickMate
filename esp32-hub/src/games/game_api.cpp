@@ -5,6 +5,9 @@
 #include "would_rather.h"
 #include "truth_dare.h"
 #include "superlatives.h"
+#include "paranoia.h"
+#include "undercover.h"
+#include "spyfall.h"
 
 #include <string.h>
 
@@ -17,6 +20,9 @@ const Game* GAMES[] = {
     &WOULD_RATHER_GAME,
     &TRUTH_DARE_GAME,
     &SUPERLATIVES_GAME,
+    &PARANOIA_GAME,
+    &UNDERCOVER_GAME,
+    &SPYFALL_GAME,
 };
 int GAMES_COUNT = sizeof(GAMES) / sizeof(GAMES[0]);
 

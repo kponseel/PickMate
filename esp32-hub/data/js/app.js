@@ -136,7 +136,8 @@ window.GamesHub.register = function (id, def) { this.games[id] = def; };
     ws.onclose = function () { setStatus("Deconnecte, reconnexion..."); setTimeout(connect, 1500); };
     ws.onmessage = function (e) {
       var m = JSON.parse(e.data);
-      if (m.t === "state") { state = m; render(); }
+      if (m.t === "state")   { state = m; render(); }
+      else if (m.t === "private" && state) { state._private = m.round || {}; render(); }
     };
   }
 

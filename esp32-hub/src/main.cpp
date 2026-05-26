@@ -132,6 +132,23 @@ static void broadcastState() {
     String out; serializeJson(doc, out);
     ws.textAll(out);
 
+    // Per-client private payloads (paranoia question, undercover word, ...).
+    // Only emitted when the current game opts in via Game::serialize_private.
+    if (current_game && current_game->serialize_private) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (!players[i].active || !players[i].name[0]) continue;
+            AsyncWebSocketClient* client = ws.client(players[i].clientId);
+            if (!client || client->status() != WS_CONNECTED) continue;
+            JsonDocument pdoc;
+            pdoc["t"] = "private";
+            JsonObject pr = pdoc["round"].to<JsonObject>();
+            current_game->serialize_private(&players[i], pr);
+            if (pr.size() == 0) continue;  // nothing to whisper
+            String pout; serializeJson(pdoc, pout);
+            client->text(pout);
+        }
+    }
+
     sendToFlipper();
 }
 
