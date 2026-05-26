@@ -16,9 +16,27 @@
 #include <ArduinoJson.h>
 
 // ---------------------------------------------------------------------------
-// Configuration
+// User-configurable settings — edit these to your taste, then re-flash.
 // ---------------------------------------------------------------------------
+
+// Wi-Fi network name shown on phones.
 static const char* AP_SSID = "Flipper-Quiz";
+
+// Optional Wi-Fi password (>= 8 chars). Set to NULL for an OPEN network.
+// Example:  static const char* AP_PASS = "monquiz2025";
+static const char* AP_PASS = NULL;
+
+// Captive-portal mode:
+//   true  = phones auto-open the game page (convenient), but show a
+//           "no internet" warning and Android may auto-disconnect.
+//   false = STEALTH. We answer connectivity probes as if internet worked, so
+//           no warning and no auto-disconnect. Players type
+//           http://192.168.4.1/ themselves (or scan a QR code you display).
+#define CAPTIVE_PORTAL_ENABLED  false
+
+// ---------------------------------------------------------------------------
+// Internal configuration (no need to edit below for normal use)
+// ---------------------------------------------------------------------------
 static const IPAddress AP_IP(192, 168, 4, 1);
 static const IPAddress AP_GATEWAY(192, 168, 4, 1);
 static const IPAddress AP_SUBNET(255, 255, 255, 0);
@@ -582,11 +600,34 @@ static void setupServer() {
     server.on("/admin/next",  HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
     server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); resetGame(); GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
 
-    // Captive-portal: any other request (incl. OS connectivity-check URLs such
-    // as /generate_204, /hotspot-detect.html, /ncsi.txt) is redirected to the
-    // portal, which makes phones pop the game page automatically.
+    // Connectivity-probe handling: depending on CAPTIVE_PORTAL_ENABLED above,
+    // we either force the captive-portal popup (aggressive) or answer probes
+    // as if internet worked (stealth — no "no internet" warning, no auto-
+    // disconnect on Android, but no auto-popup either).
     server.onNotFound([](AsyncWebServerRequest* req) {
+#if CAPTIVE_PORTAL_ENABLED
         req->redirect("http://192.168.4.1/");
+#else
+        String url = req->url();
+        // Android (Chrome / system): expects HTTP 204 No Content.
+        if (url.endsWith("/generate_204") || url == "/gen_204") {
+            req->send(204);
+        // Windows: expects "Microsoft NCSI" or "Microsoft Connect Test".
+        } else if (url.indexOf("ncsi.txt") >= 0) {
+            req->send(200, "text/plain", "Microsoft NCSI");
+        } else if (url.indexOf("connecttest.txt") >= 0) {
+            req->send(200, "text/plain", "Microsoft Connect Test");
+        // iOS / macOS: expects an HTML page containing the word "Success".
+        } else if (url.indexOf("hotspot-detect") >= 0 || url.indexOf("success.html") >= 0
+                || url.indexOf("library/test") >= 0) {
+            req->send(200, "text/html",
+                "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");
+        } else {
+            // Any other unknown URL — still serve the game page so a user typing
+            // anything in the address bar lands on the quiz.
+            req->send(200, "text/html", INDEX_HTML);
+        }
+#endif
     });
 
     server.begin();
@@ -600,7 +641,7 @@ void setup() {
 
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
-    WiFi.softAP(AP_SSID, NULL, 1, 0, AP_MAX_CONN);  // open network, up to AP_MAX_CONN stations
+    WiFi.softAP(AP_SSID, AP_PASS, 1, 0, AP_MAX_CONN);  // open if AP_PASS==NULL, else WPA2
 
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(DNS_PORT, "*", AP_IP);  // resolve every domain to the ESP32
