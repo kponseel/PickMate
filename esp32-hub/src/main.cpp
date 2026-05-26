@@ -94,11 +94,15 @@ static void broadcastState() {
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (!players[i].name[0]) continue;  // never assigned
         JsonObject po = pa.add<JsonObject>();
-        po["id"]        = players[i].clientId;
-        po["name"]      = players[i].name;
-        po["score"]     = players[i].score;
-        po["connected"] = players[i].active;
-        po["host"]      = host_is(players[i].clientId);
+        po["id"]            = players[i].clientId;
+        po["name"]          = players[i].name;
+        po["score"]         = players[i].score;
+        po["connected"]     = players[i].active;
+        po["host"]          = host_is(players[i].clientId);
+        po["ip"]            = IPAddress(players[i].ip).toString();
+        po["connect_count"] = players[i].connect_count;
+        po["first_seen_ms"] = players[i].first_seen_ms;
+        po["last_seen_ms"]  = players[i].last_seen_ms;
     }
 
     JsonObject round = doc["round"].to<JsonObject>();
@@ -162,12 +166,26 @@ static void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t le
 
     if (strcmp(t, "join") == 0) {
         const char* name = doc["name"] | "Joueur";
-        Player* p = findReconnectSlot(name);
+        uint32_t ip = (uint32_t)client->remoteIP();
+
+        // Re-identification priority:
+        //  1) Same device (IP) → keep score & history even if pseudo changed
+        //  2) Same pseudo → classic name-based reconnect
+        //  3) Existing slot on this WS client → already-joined edge case
+        //  4) Fresh slot
+        Player* p = findByIp(ip);
+        if (!p) p = findReconnectSlot(name);
         if (!p) p = findPlayer(client->id());
         if (!p) p = addPlayer(client->id());
+
         if (p) {
+            uint32_t now = millis();
             p->active   = true;
             p->clientId = client->id();
+            p->ip       = ip;
+            if (p->first_seen_ms == 0) p->first_seen_ms = now;
+            p->last_seen_ms = now;
+            p->connect_count++;
             strncpy(p->name, name, MAX_NAME_LEN);
             p->name[MAX_NAME_LEN] = '\0';
             host_recompute();
@@ -199,6 +217,7 @@ static void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t le
     } else if (current_game && current_game->on_message) {
         Player* p = findPlayer(client->id());
         if (p) {
+            p->last_seen_ms = millis();
             current_game->on_message(p, doc);
             broadcastState();
         }
@@ -218,6 +237,7 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client,
     } else if (type == WS_EVT_DISCONNECT) {
         GAME_LOCK();
         Player* p = findPlayer(client->id());
+        if (p) p->last_seen_ms = millis();
         removePlayer(client->id());
         host_recompute();
         if (current_game && current_game->on_player_leave && p) current_game->on_player_leave(p);

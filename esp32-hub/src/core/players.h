@@ -23,12 +23,26 @@ struct Player {
     bool     answered;
     uint8_t  answer;
     uint32_t answerMs;
+
+    // Device identification & session history (stable across reconnects).
+    // `ip` is the IPv4 assigned by softAP DHCP; it's MAC-equivalent in
+    // practice (DHCP reuses the same address for the same MAC as long as
+    // the lease holds). 0 means "unknown / never connected".
+    uint32_t ip;
+    uint32_t connect_count;
+    uint32_t first_seen_ms;
+    uint32_t last_seen_ms;
 };
 
 extern Player players[MAX_PLAYERS];
 
 // Lookup an active player by its WebSocket client id.
 Player* findPlayer(uint32_t clientId);
+
+// Match by IP (stable device identifier). Prefers an active match; otherwise
+// returns a disconnected slot with the same IP. Returns nullptr if `ip` is 0
+// or unknown.
+Player* findByIp(uint32_t ip);
 
 // A disconnected slot with the same name: lets a reconnecting phone reclaim
 // its score instead of starting over.

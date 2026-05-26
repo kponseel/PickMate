@@ -9,6 +9,17 @@ Player* findPlayer(uint32_t clientId) {
     return nullptr;
 }
 
+Player* findByIp(uint32_t ip) {
+    if (ip == 0) return nullptr;
+    // Active session at this IP (rare race: WS reconnect before DHCP turnover)
+    for (int i = 0; i < MAX_PLAYERS; i++)
+        if (players[i].active && players[i].ip == ip) return &players[i];
+    // Disconnected ghost previously seen at this IP
+    for (int i = 0; i < MAX_PLAYERS; i++)
+        if (!players[i].active && players[i].name[0] && players[i].ip == ip) return &players[i];
+    return nullptr;
+}
+
 Player* findReconnectSlot(const char* name) {
     for (int i = 0; i < MAX_PLAYERS; i++)
         if (!players[i].active && players[i].name[0] &&
