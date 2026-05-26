@@ -429,6 +429,11 @@ void setup() {
     Serial.begin(115200);
     gameMutex = xSemaphoreCreateMutex();
 
+    // Seed Arduino's random() from the ESP32 hardware RNG so games that pull
+    // random prompts (truth_dare) don't start with the same sequence every
+    // boot.
+    randomSeed(esp_random());
+
     if (!LittleFS.begin(/*formatOnFail=*/true)) {
         Serial.println("[GamesHub] LittleFS mount failed — did you run `pio run -t uploadfs`?");
     } else {
