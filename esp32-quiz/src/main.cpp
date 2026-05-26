@@ -9,14 +9,13 @@
  */
 
 #include <Arduino.h>
-#include <WiFi.h>
-#include <DNSServer.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
 #include "core/players.h"
 #include "core/flipper_uart.h"
+#include "core/wifi_portal.h"
 
 // ---------------------------------------------------------------------------
 // User-configurable settings — edit these to your taste, then re-flash.
@@ -40,15 +39,10 @@ static const char* AP_PASS = NULL;
 // ---------------------------------------------------------------------------
 // Internal configuration (no need to edit below for normal use)
 // ---------------------------------------------------------------------------
-static const IPAddress AP_IP(192, 168, 4, 1);
-static const IPAddress AP_GATEWAY(192, 168, 4, 1);
-static const IPAddress AP_SUBNET(255, 255, 255, 0);
-static const byte DNS_PORT = 53;
-
-// Flipper UART pinout + low-level transport live in core/flipper_uart.{h,cpp}.
+// Networking (SoftAP, DNS catch-all) lives in core/wifi_portal.{h,cpp}.
+// Flipper UART pinout + transport lives in core/flipper_uart.{h,cpp}.
 
 #define QUESTION_TIME_MS   20000UL
-#define AP_MAX_CONN        8    // ESP32 SoftAP practical limit (~8 phones)
 
 // Admin panel credentials (HTTP Basic Auth). NOTE: plaintext over an open
 // Wi-Fi network - a convenience gate, not real security.
@@ -83,7 +77,6 @@ static GameState gameState        = LOBBY;
 static int       currentQuestion  = -1;
 static uint32_t  questionStartMs  = 0;
 
-DNSServer       dnsServer;
 AsyncWebServer  server(80);
 AsyncWebSocket  ws("/ws");
 
@@ -575,20 +568,13 @@ void setup() {
     flipper_uart_begin();
     flipper_uart_set_command_handler(onFlipperCommand);
 
-    WiFi.mode(WIFI_AP);
-    WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
-    WiFi.softAP(AP_SSID, AP_PASS, 1, 0, AP_MAX_CONN);  // open if AP_PASS==NULL, else WPA2
-
-    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-    dnsServer.start(DNS_PORT, "*", AP_IP);  // resolve every domain to the ESP32
+    wifi_portal_begin(AP_SSID, AP_PASS);
 
     setupServer();
-
-    Serial.printf("Flipper-Quiz AP '%s' up at %s\n", AP_SSID, WiFi.softAPIP().toString().c_str());
 }
 
 void loop() {
-    dnsServer.processNextRequest();
+    wifi_portal_poll();
     ws.cleanupClients();
     flipper_uart_poll();
 
