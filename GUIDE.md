@@ -19,7 +19,7 @@ Un quiz type « Kahoot » qui marche **hors-ligne**, chez toi :
 ```
 Telephones ──Wi-Fi──> ESP32-S2 (reseau "Paris - Mini Jeux Gratuits")
    (page de jeu)          │
-                          └──cable interne──> Flipper Zero (app Quiz Master)
+                          └──cable interne──> Flipper Zero (app GamesHub)
 ```
 
 ---
@@ -169,7 +169,7 @@ circule en clair : c'est un simple garde-fou, pas une vraie sécurité.
 > Pour seulement compiler sans lancer : `ufbt`. Le fichier `.fap` se trouve alors
 > dans `dist\`. Tu peux aussi le copier à la main dans `apps\GPIO\` sur la carte SD.
 
-Plus tard, l'app reste accessible sur le Flipper dans **Apps → GPIO → Quiz Master**.
+Plus tard, l'app reste accessible sur le Flipper dans **Apps → GPIO → GamesHub**.
 
 ---
 
@@ -188,7 +188,7 @@ Plus tard, l'app reste accessible sur le Flipper dans **Apps → GPIO → Quiz M
 
 ## 7. Lancer une partie 🎉
 
-1. Sur le Flipper : ouvre **Apps → GPIO → Quiz Master**. L'écran affiche
+1. Sur le Flipper : ouvre **Apps → GPIO → GamesHub**. L'écran affiche
    `Joueurs: 0` et `Etat: lobby`.
 2. **Joueurs** : sur chaque téléphone, ouvre les réglages Wi-Fi et rejoins le
    réseau **`Paris - Mini Jeux Gratuits`** (réseau ouvert, sans mot de passe). La page du jeu

@@ -29,7 +29,7 @@ cd ..\apps\gameshub
 ufbt launch
 ```
 
-Puis : monte la board sur le Flipper, ouvre **Apps → GPIO → Quiz Master**, connecte un
+Puis : monte la board sur le Flipper, ouvre **Apps → GPIO → GamesHub**, connecte un
 téléphone au Wi-Fi **`Paris - Mini Jeux Gratuits`**. Pilotage aussi possible via la page **Admin**
 (lien en bas de la page joueur → `http://192.168.4.1/admin`, login `admin` / `adminadmin`).
 
