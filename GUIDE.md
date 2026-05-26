@@ -110,25 +110,34 @@ cd PickMate
    ```
    Note le port (ex. `COM5`). Tu peux aussi regarder dans le **Gestionnaire de
    périphériques** → *Ports (COM et LPT)*.
-3. Compile et téléverse :
+3. Compile et téléverse le **firmware** :
    ```powershell
    cd esp32-quiz
    pio run -t upload
    ```
    La première fois, PlatformIO télécharge l'outillage ESP32 (quelques minutes).
 
-4. **Si le flash échoue** (« Failed to connect », « No serial data received »),
+4. Téléverse la **page web** (SPA `data/`) sur le LittleFS :
+   ```powershell
+   pio run -t uploadfs
+   ```
+   ⚠️ **Indispensable** : sans cette étape, la page joueur sera vide et l'admin
+   panel inaccessible. À refaire chaque fois que tu modifies un fichier dans
+   `esp32-quiz/data/` (HTML/CSS/JS).
+
+5. **Si un flash échoue** (« Failed to connect », « No serial data received »),
    mets la carte en **mode bootloader** :
    - **Maintiens le bouton `BOOT`** de la Dev Board,
    - appuie brièvement sur `RESET` (sans lâcher BOOT),
    - **relâche `BOOT`**,
-   - relance `pio run -t upload`.
+   - relance la commande (`pio run -t upload` ou `pio run -t uploadfs`).
 
-5. **Vérifie que ça tourne** :
+6. **Vérifie que ça tourne** :
    ```powershell
    pio device monitor
    ```
-   Tu dois voir une ligne du type `Flipper-Quiz AP 'Flipper-Quiz' up at 192.168.4.1`.
+   Tu dois voir une ligne du type `[wifi_portal] AP 'GamesHub' up at 192.168.4.1`
+   suivie de `LittleFS mounted (used ... bytes)` et `1 game(s) registered`.
    (Quitte le moniteur avec `Ctrl+C`.)
 
 ✅ À ce stade, même sans le Flipper, tu peux déjà tester : connecte ton téléphone

@@ -26,10 +26,13 @@ ufbt update    # 1re fois : télécharge le SDK Flipper correspondant
 ```powershell
 cd esp32-quiz
 pio device list        # repérer le port COM de la board
-pio run -t upload      # compile + flashe. La sortie DOIT dire "Chip is ESP32-S2"
-pio device monitor     # doit afficher "Flipper-Quiz AP ... up at 192.168.4.1" (Ctrl+C pour quitter)
+pio run -t upload      # 1/ firmware. La sortie DOIT dire "Chip is ESP32-S2"
+pio run -t uploadfs    # 2/ INDISPENSABLE : flashe la SPA (data/) sur LittleFS
+pio device monitor     # doit afficher "[wifi_portal] AP ... up at 192.168.4.1" (Ctrl+C pour quitter)
 ```
 - Si **"Failed to connect"** : maintenir **BOOT**, taper **RESET**, relâcher BOOT, relancer.
+- **Sans `uploadfs`**, la page joueur est vide et `/admin` 404. À refaire à chaque
+  modif sous `esp32-quiz/data/`.
 - À ce stade, testable sans le Flipper : téléphone → Wi-Fi `Flipper-Quiz` → page de jeu.
 
 ## Étape B — installer l'app Flipper

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GamesHub - Admin</title>
+<style>
+  *{box-sizing:border-box;font-family:system-ui,sans-serif}
+  body{background:#0f1020;color:#fff;margin:0;padding:20px;text-align:center}
+  h1{font-size:1.4rem;margin:8px 0 16px}
+  .card{background:#1b1d35;border-radius:12px;padding:16px;margin:0 auto 16px;max-width:420px}
+  .row{display:flex;justify-content:space-between;padding:6px 2px;color:#cdd}
+  .row b{color:#fff}
+  button{width:100%;max-width:420px;padding:18px;font-size:1.2rem;font-weight:700;border:none;border-radius:12px;color:#fff;margin:8px auto;display:block;cursor:pointer}
+  .next{background:#26890c}.reset{background:#e6394a}
+  a{color:#9aa}
+</style></head><body>
+<h1>GamesHub &mdash; Admin</h1>
+<div class="card">
+  <div class="row"><span>Jeu</span><b id="game">-</b></div>
+  <div class="row"><span>Phase</span><b id="phase">...</b></div>
+  <div class="row"><span>Joueurs</span><b id="players">0</b></div>
+  <div class="row"><span>Hote</span><b id="host">-</b></div>
+  <div class="row"><span>Progression</span><b id="progress">-</b></div>
+</div>
+<button class="next" onclick="act('next')">Demarrer / Suivant</button>
+<button class="reset" onclick="act('reset')">Reset</button>
+<p><a href="/">Retour a la page joueur</a></p>
+<script>
+function act(a){fetch('/admin/'+a).then(refresh);}
+function refresh(){fetch('/admin/state').then(function(r){return r.json();}).then(function(s){
+  document.getElementById('game').textContent=s.game||'-';
+  document.getElementById('phase').textContent=s.phase;
+  document.getElementById('players').textContent=s.players;
+  document.getElementById('host').textContent=s.host||'-';
+  document.getElementById('progress').textContent=s.progress||'-';
+}).catch(function(){});}
+setInterval(refresh,1500);refresh();
+</script></body></html>

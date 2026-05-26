@@ -21,7 +21,8 @@ ufbt update                      # SDK Flipper (1re fois)
 
 # 1) Serveur ESP32 (Wi-Fi Dev Board branchée par son USB)
 cd esp32-quiz
-pio run -t upload                # flashe ; "Failed to connect" -> BOOT maintenu + RESET, relâche, relance
+pio run -t upload                # flashe le firmware ; "Failed to connect" -> BOOT maintenu + RESET, relâche, relance
+pio run -t uploadfs              # INDISPENSABLE : flashe data/ (page web) sur LittleFS
 
 # 2) App Flipper (FERMER qFlipper d'abord — il verrouille le port)
 cd ..\apps\quiz_master
