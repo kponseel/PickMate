@@ -32,7 +32,7 @@ static const char* AP_PASS = NULL;
 //   false = STEALTH. We answer connectivity probes as if internet worked, so
 //           no warning and no auto-disconnect. Players type
 //           http://192.168.4.1/ themselves (or scan a QR code you display).
-#define CAPTIVE_PORTAL_ENABLED  false
+#define CAPTIVE_PORTAL_ENABLED  true
 
 // ---------------------------------------------------------------------------
 // Internal configuration (no need to edit below for normal use)
@@ -139,10 +139,18 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
   ol{padding-left:0;list-style:none}
   li{display:flex;justify-content:space-between;padding:10px 14px;background:#1b1d35;border-radius:10px;margin-bottom:8px}
   button:disabled{opacity:.4}
+  .notice{background:#2d2105;color:#ffd56b;border-left:4px solid #ffb000;padding:12px 14px;border-radius:10px;font-size:0.92rem;line-height:1.45;margin-bottom:18px}
+  .notice b{color:#fff}
+  .notice .lang{display:block;margin-top:6px}
 </style></head><body>
 <h1>Flipper-Quiz</h1><div class="sub" id="status">Connexion...</div>
 
 <div class="screen on" id="s-join">
+  <div class="notice">
+    &#9888;&#65039; <b>Android</b> peut afficher "Pas d'acces Internet" / "No internet".
+    <span class="lang">&#127467;&#127479; Choisis <b>"Rester connecte"</b> ou <b>"Utiliser ce reseau quand meme"</b>.</span>
+    <span class="lang">&#127468;&#127463; Tap <b>"Stay connected"</b> or <b>"Use this network as-is"</b>.</span>
+  </div>
   <input id="name" placeholder="Ton pseudo" maxlength="16" autocomplete="off">
   <button class="primary" id="joinBtn">Rejoindre</button>
 </div>
