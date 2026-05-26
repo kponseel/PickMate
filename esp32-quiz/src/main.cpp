@@ -1,11 +1,15 @@
 /*
- * Flipper-Quiz - local, offline multiplayer quiz server for the ESP32-S2
- * Wi-Fi Developer Board.
+ * GamesHub (was Flipper-Quiz) — local, offline multiplayer party-game server
+ * for the ESP32-S2 Wi-Fi Developer Board clipped onto a Flipper Zero.
  *
- * The ESP32 opens an open Wi-Fi access point ("Flipper-Quiz"), runs a captive
- * portal so phones auto-open the game UI, serves a single embedded HTML page,
- * and drives the game over WebSockets. The game master advances questions from
- * the Flipper Zero (UART) or from a browser (/admin/* endpoints).
+ * The ESP32 opens an open Wi-Fi access point, runs a captive portal so phones
+ * auto-open the hub UI, serves the embedded SPA, and synchronises the game
+ * over WebSockets. The Flipper Zero displays the live state and the host's
+ * physical buttons (OK = NEXT, Down = RESET) drive the game.
+ *
+ * The core (this file + core/) owns the lobby, players, WS hub, UART pump and
+ * unified state push. Each game ships as a module under games/ that plugs
+ * into the GAMES[] registry — see games/game_api.h.
  */
 
 #include <Arduino.h>
@@ -16,6 +20,7 @@
 #include "core/players.h"
 #include "core/flipper_uart.h"
 #include "core/wifi_portal.h"
+#include "games/game_api.h"
 
 // ---------------------------------------------------------------------------
 // User-configurable settings — edit these to your taste, then re-flash.
@@ -25,104 +30,93 @@
 static const char* AP_SSID = "Flipper-Quiz";
 
 // Optional Wi-Fi password (>= 8 chars). Set to NULL for an OPEN network.
-// Example:  static const char* AP_PASS = "monquiz2025";
 static const char* AP_PASS = NULL;
 
 // Captive-portal mode:
-//   true  = phones auto-open the game page (convenient), but show a
-//           "no internet" warning and Android may auto-disconnect.
+//   true  = phones auto-open the hub page (convenient), but Android may show
+//           a "no internet" warning and might auto-disconnect.
 //   false = STEALTH. We answer connectivity probes as if internet worked, so
 //           no warning and no auto-disconnect. Players type
-//           http://192.168.4.1/ themselves (or scan a QR code you display).
+//           http://192.168.4.1/ themselves (or scan a QR code).
 #define CAPTIVE_PORTAL_ENABLED  true
 
-// ---------------------------------------------------------------------------
-// Internal configuration (no need to edit below for normal use)
-// ---------------------------------------------------------------------------
-// Networking (SoftAP, DNS catch-all) lives in core/wifi_portal.{h,cpp}.
-// Flipper UART pinout + transport lives in core/flipper_uart.{h,cpp}.
-
-#define QUESTION_TIME_MS   20000UL
-
 // Admin panel credentials (HTTP Basic Auth). NOTE: plaintext over an open
-// Wi-Fi network - a convenience gate, not real security.
+// Wi-Fi network — a convenience gate, not real security.
 #define ADMIN_USER "admin"
 #define ADMIN_PASS "adminadmin"
 
 // ---------------------------------------------------------------------------
-// Quiz content - edit freely
+// Globals
 // ---------------------------------------------------------------------------
-struct Question {
-    const char* text;
-    const char* options[4];
-    uint8_t     correct;  // 0..3
-};
-
-static const Question QUESTIONS[] = {
-    {"Quelle est la capitale de la France ?", {"Lyon", "Paris", "Marseille", "Nice"}, 1},
-    {"Combien font 7 x 8 ?", {"54", "56", "64", "48"}, 1},
-    {"Quel gaz les plantes absorbent-elles ?", {"Oxygene", "Azote", "CO2", "Helium"}, 2},
-    {"Quel est le plus grand ocean ?", {"Atlantique", "Indien", "Arctique", "Pacifique"}, 3},
-    {"Combien de bits dans un octet ?", {"4", "8", "16", "32"}, 1},
-};
-static const int QUESTION_COUNT = sizeof(QUESTIONS) / sizeof(QUESTIONS[0]);
-
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
-enum GameState { LOBBY, QUESTION, REVEAL, FINISHED };
-
-// players[] now lives in core/players.cpp (see core/players.h).
-static GameState gameState        = LOBBY;
-static int       currentQuestion  = -1;
-static uint32_t  questionStartMs  = 0;
-
 AsyncWebServer  server(80);
 AsyncWebSocket  ws("/ws");
 
-// Serializes every access to the game state, which is touched both by the loop
-// task (UART / question timeout) and by the AsyncTCP task (WebSocket and HTTP
-// admin callbacks). Held only at the outermost entry points below; the internal
-// game-flow functions assume it is already taken.
+// Serialises every access to game/player state across the loop() and the
+// AsyncTCP task. Held at the outermost entry points; internal helpers assume
+// it is already taken.
 static SemaphoreHandle_t gameMutex;
 #define GAME_LOCK()   xSemaphoreTake(gameMutex, portMAX_DELAY)
 #define GAME_UNLOCK() xSemaphoreGive(gameMutex)
 
+static const char* phase_str(GamePhase p) {
+    switch (p) {
+        case GAME_PHASE_LOBBY:    return "lobby";
+        case GAME_PHASE_PLAYING:  return "playing";
+        case GAME_PHASE_REVEAL:   return "reveal";
+        case GAME_PHASE_FINISHED: return "finished";
+    }
+    return "?";
+}
+
+// Forward declarations
+static void broadcastState();
+static void sendToFlipper();
+
 // ---------------------------------------------------------------------------
-// Embedded player UI (single page, vanilla JS, mobile-first)
+// Embedded player SPA (single page, vanilla JS, mobile-first).
+// Will migrate to LittleFS in C6.
 // ---------------------------------------------------------------------------
 static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Flipper-Quiz</title>
+<title>GamesHub</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
   html,body{height:100%}
   body{background:#0f1020;color:#fff;display:flex;flex-direction:column;min-height:100vh;padding:16px}
   h1{font-size:1.6rem;text-align:center;margin:8px 0 4px}
-  .sub{text-align:center;color:#9aa;margin-bottom:24px}
-  .screen{flex:1;display:none;flex-direction:column;justify-content:center;gap:16px}
+  h2{font-size:1.2rem;text-align:center;margin:4px 0 12px;color:#cdd}
+  .sub{text-align:center;color:#9aa;margin-bottom:18px;font-size:0.95rem}
+  .screen{flex:1;display:none;flex-direction:column;justify-content:flex-start;gap:14px}
   .screen.on{display:flex}
   input{padding:16px;font-size:1.2rem;border:none;border-radius:12px;width:100%}
-  button{padding:18px;font-size:1.2rem;font-weight:700;border:none;border-radius:12px;color:#fff;cursor:pointer}
+  button{padding:16px;font-size:1.15rem;font-weight:700;border:none;border-radius:12px;color:#fff;cursor:pointer}
   .primary{background:#5b6cff}
+  .ghost{background:#1b1d35;color:#cdd}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1}
   .grid button{font-size:1.4rem;min-height:96px}
   .a{background:#e6394a}.b{background:#1368ce}.c{background:#d89e00}.d{background:#26890c}
-  .q{font-size:1.4rem;text-align:center;margin-bottom:8px}
+  .q{font-size:1.3rem;text-align:center;margin-bottom:8px}
   .big{font-size:3rem;text-align:center}
   .center{text-align:center}
-  .muted{color:#9aa}
+  .muted{color:#9aa;font-size:0.9rem}
   ol{padding-left:0;list-style:none}
   li{display:flex;justify-content:space-between;padding:10px 14px;background:#1b1d35;border-radius:10px;margin-bottom:8px}
-  button:disabled{opacity:.4}
-  .notice{background:#2d2105;color:#ffd56b;border-left:4px solid #ffb000;padding:12px 14px;border-radius:10px;font-size:0.92rem;line-height:1.45;margin-bottom:18px}
-  .notice b{color:#fff}
-  .notice .lang{display:block;margin-top:6px}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .notice{background:#2d2105;color:#ffd56b;border-left:4px solid #ffb000;padding:12px 14px;border-radius:10px;font-size:0.9rem;line-height:1.45;margin-bottom:14px}
+  .notice b{color:#fff} .notice .lang{display:block;margin-top:4px}
+  .game-card{background:#1b1d35;border-radius:12px;padding:16px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:14px}
+  .game-card.disabled{opacity:.5;cursor:not-allowed}
+  .game-card .icon{font-size:2rem}
+  .game-card .name{font-size:1.1rem;font-weight:700}
+  .crown{color:#ffd56b}
+  .playerlist{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
+  .chip{background:#1b1d35;padding:6px 10px;border-radius:999px;font-size:0.9rem}
 </style></head><body>
-<h1>Flipper-Quiz</h1><div class="sub" id="status">Connexion...</div>
+<h1>GamesHub</h1><div class="sub" id="status">Connexion...</div>
 
+<!-- ============ JOIN ============ -->
 <div class="screen on" id="s-join">
   <div class="notice">
     &#9888;&#65039; <b>Android</b> peut afficher "Pas d'acces Internet" / "No internet".
@@ -133,12 +127,25 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
   <button class="primary" id="joinBtn">Rejoindre</button>
 </div>
 
-<div class="screen" id="s-wait">
-  <div class="big">&#9203;</div>
-  <div class="center">En attente du maitre du jeu...</div>
-  <div class="center muted" id="waitMsg"></div>
+<!-- ============ HUB (no game selected) ============ -->
+<div class="screen" id="s-hub">
+  <h2>Choisis un jeu</h2>
+  <div id="gameList"></div>
+  <div class="muted center" id="hubHint"></div>
+  <div class="playerlist" id="hubPlayers"></div>
 </div>
 
+<!-- ============ LOBBY (game selected, waiting to start) ============ -->
+<div class="screen" id="s-lobby">
+  <div class="big" id="lobbyEmoji"></div>
+  <h2 id="lobbyName"></h2>
+  <div class="playerlist" id="lobbyPlayers"></div>
+  <div class="center muted" id="lobbyHint">En attente du maitre du jeu...</div>
+  <button class="primary" id="startBtn" style="display:none">Demarrer la partie</button>
+  <button class="ghost" id="backToHubBtn" style="display:none">Retour au hub</button>
+</div>
+
+<!-- ============ QUESTION (quiz playing) ============ -->
 <div class="screen" id="s-question">
   <div class="q" id="qText"></div>
   <div class="grid">
@@ -147,86 +154,182 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
     <button class="c" data-c="2" id="b2"></button>
     <button class="d" data-c="3" id="b3"></button>
   </div>
+  <div class="center muted" id="qStatus"></div>
 </div>
 
+<!-- ============ REVEAL ============ -->
 <div class="screen" id="s-reveal">
   <div class="big" id="revealMark"></div>
   <div class="center" id="revealMsg"></div>
   <div class="center muted">Score : <span id="myScore">0</span></div>
+  <button class="primary" id="nextBtn" style="display:none">Question suivante</button>
 </div>
 
+<!-- ============ END / SCOREBOARD ============ -->
 <div class="screen" id="s-end">
-  <h1>Classement</h1>
+  <h2>Classement</h2>
   <ol id="board"></ol>
+  <button class="primary" id="resetBtn" style="display:none">Recommencer</button>
 </div>
 
 <div class="center muted" style="margin-top:12px"><a href="/admin" style="color:#778">Admin</a></div>
 
 <script>
-var ws, joined=false, myName="", answered=false, myChoice=-1, answeredCorrect=false;
-var screens={join:"s-join",wait:"s-wait",question:"s-question",reveal:"s-reveal",end:"s-end"};
-function show(name){for(var k in screens){document.getElementById(screens[k]).classList.toggle("on",k===name);}}
-function setStatus(t){document.getElementById("status").textContent=t;}
+// Mirror of the server registry (server is source of truth for logic).
+var GAMES = {
+  quiz: { name:"Quiz", emoji:"🧠", desc:"Questions a choix multiples, score chrono." }
+};
+
+var ws, joined=false, myName="", state=null, lastAnswerChoice=-1;
+
+function $(id){return document.getElementById(id);}
+function setStatus(t){$("status").textContent=t;}
+
+var screens=["s-join","s-hub","s-lobby","s-question","s-reveal","s-end"];
+function show(id){screens.forEach(function(s){$(s).classList.toggle("on",s===id);});}
+
+function findMe(){if(!state||!myName)return null;for(var i=0;i<state.players.length;i++)if(state.players[i].name===myName)return state.players[i];return null;}
+function amHost(){var me=findMe();return !!(me&&me.host);}
+
+function send(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));}
 
 function connect(){
   ws=new WebSocket("ws://"+location.host+"/ws");
-  ws.onopen=function(){if(myName){ws.send(JSON.stringify({type:"join",name:myName}));setStatus("Connecte - "+myName);}else setStatus("Choisis ton pseudo");};
+  ws.onopen=function(){
+    if(myName){send({t:"join",name:myName});setStatus("Connecte - "+myName);}
+    else setStatus("Choisis ton pseudo");
+  };
   ws.onclose=function(){setStatus("Deconnecte, reconnexion...");setTimeout(connect,1500);};
-  ws.onmessage=function(e){handle(JSON.parse(e.data));};
+  ws.onmessage=function(e){
+    var m=JSON.parse(e.data);
+    if(m.t==="state"){state=m;joined=joined||(findMe()!==null);render();}
+  };
 }
 
-function handle(m){
-  if(m.type==="joined"){joined=true;setStatus("Connecte - "+myName);show("wait");}
-  else if(m.type==="lobby"){document.getElementById("waitMsg").textContent=m.players+" joueur(s) connecte(s)";if(joined)show("wait");}
-  else if(m.type==="question"){
-    answered=false;myChoice=-1;
-    document.getElementById("qText").textContent="("+(m.index+1)+"/"+m.total+") "+m.q;
-    for(var i=0;i<4;i++){var b=document.getElementById("b"+i);b.textContent=m.options[i];b.disabled=false;}
-    setStatus("Reponds vite !");show("question");
+function render(){
+  if(!state){show("s-join");return;}
+  // Are we even joined?
+  if(!findMe()){show("s-join");return;}
+
+  // Currently playing a game?
+  if(state.game){
+    var game=GAMES[state.game];
+    if(state.phase==="lobby"){renderLobby(game);}
+    else if(state.game==="quiz"){renderQuiz();}
+    return;
   }
-  else if(m.type==="ack"){setStatus("Reponse envoyee, attends les autres...");for(var i=0;i<4;i++)document.getElementById("b"+i).disabled=true;}
-  else if(m.type==="reveal"){
-    answeredCorrect=(answered && myChoice===m.correct);
-    var me=findMe(m.scores);
-    document.getElementById("myScore").textContent=me?me.score:0;
-    document.getElementById("revealMark").innerHTML=(answeredCorrect?"&#9989;":"&#10067;");
-    document.getElementById("revealMsg").textContent="Bonne reponse : "+["A","B","C","D"][m.correct];
-    show("reveal");
-  }
-  else if(m.type==="finished"){renderBoard(m.scores);show("end");setStatus("Partie terminee");}
+  // No game selected -> hub
+  renderHub();
 }
 
-function findMe(scores){for(var i=0;i<scores.length;i++)if(scores[i].name===myName)return scores[i];return null;}
-function renderBoard(scores){
-  var ol=document.getElementById("board");ol.innerHTML="";
-  scores.forEach(function(s,i){var li=document.createElement("li");
-    li.innerHTML="<span>"+(i+1)+". "+escapeHtml(s.name)+"</span><b>"+s.score+"</b>";ol.appendChild(li);});
+function renderPlayerChips(target){
+  var el=$(target);el.innerHTML="";
+  state.players.forEach(function(p){
+    var c=document.createElement("span");c.className="chip";
+    c.innerHTML=(p.host?"<span class=crown>&#x1F451;</span> ":"")+escapeHtml(p.name);
+    el.appendChild(c);
+  });
 }
+
+function renderHub(){
+  show("s-hub");
+  var list=$("gameList");list.innerHTML="";
+  var iAmHost=amHost();
+  Object.keys(GAMES).forEach(function(id){
+    var g=GAMES[id];
+    var card=document.createElement("div");
+    card.className="game-card"+(iAmHost?"":" disabled");
+    card.innerHTML='<div class="icon">'+g.emoji+'</div><div><div class="name">'+escapeHtml(g.name)+'</div><div class="muted">'+escapeHtml(g.desc||"")+'</div></div>';
+    if(iAmHost){card.onclick=function(){send({t:"select_game",id:id});};}
+    list.appendChild(card);
+  });
+  $("hubHint").textContent=iAmHost?"Tu es l'hote, clique sur un jeu.":"En attente que l'hote choisisse un jeu.";
+  renderPlayerChips("hubPlayers");
+  setStatus("Hub - "+myName);
+}
+
+function renderLobby(game){
+  show("s-lobby");
+  $("lobbyEmoji").textContent=game?game.emoji:"";
+  $("lobbyName").textContent=game?game.name:"";
+  renderPlayerChips("lobbyPlayers");
+  var iAmHost=amHost();
+  $("startBtn").style.display=iAmHost?"block":"none";
+  $("backToHubBtn").style.display=iAmHost?"block":"none";
+  $("lobbyHint").textContent=iAmHost?"Quand tout le monde est la, clique Demarrer.":"En attente du maitre du jeu...";
+  setStatus("Lobby - "+myName);
+}
+
+function renderQuiz(){
+  var r=state.round||{};
+  if(state.phase==="playing"){
+    show("s-question");
+    var locked=(findMe()&&findMe().score!==undefined&&lastAnswerChoice>=0);
+    // (using local lastAnswerChoice flag instead of per-player tracking from server for now)
+    $("qText").textContent="("+((r.idx||0)+1)+"/"+(r.total||"?")+") "+(r.q||"");
+    for(var i=0;i<4;i++){
+      var b=$("b"+i);
+      b.textContent=(r.options&&r.options[i])||"";
+      b.disabled=locked;
+    }
+    $("qStatus").textContent=locked?"Reponse envoyee, attends les autres...":(r.answered!==undefined?(r.answered+" / "+state.players.length+" repondu(s)"):"");
+  } else if(state.phase==="reveal"){
+    show("s-reveal");
+    var correct=r.correct;
+    var ok=(lastAnswerChoice===correct);
+    var me=findMe();
+    $("myScore").textContent=me?me.score:0;
+    $("revealMark").innerHTML=(ok?"&#9989;":"&#10067;");
+    $("revealMsg").textContent="Bonne reponse : "+["A","B","C","D"][correct];
+    $("nextBtn").style.display=amHost()?"block":"none";
+    lastAnswerChoice=-1;
+  } else if(state.phase==="finished"){
+    show("s-end");
+    var ol=$("board");ol.innerHTML="";
+    var sorted=state.players.slice().sort(function(a,b){return b.score-a.score;});
+    sorted.forEach(function(p,i){
+      var li=document.createElement("li");
+      li.innerHTML="<span>"+(i+1)+". "+(p.host?"<span class=crown>&#x1F451;</span> ":"")+escapeHtml(p.name)+"</span><b>"+p.score+"</b>";
+      ol.appendChild(li);
+    });
+    $("resetBtn").style.display=amHost()?"block":"none";
+    lastAnswerChoice=-1;
+  } else {
+    // quiz lobby is handled by renderLobby() above
+  }
+}
+
 function escapeHtml(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML;}
 
-document.getElementById("joinBtn").onclick=function(){
-  var n=document.getElementById("name").value.trim();
-  if(!n)return;myName=n.substring(0,16);
-  ws.send(JSON.stringify({type:"join",name:myName}));
+$("joinBtn").onclick=function(){
+  var n=$("name").value.trim();if(!n)return;myName=n.substring(0,16);
+  send({t:"join",name:myName});
 };
+$("startBtn").onclick=function(){send({t:"next"});};
+$("backToHubBtn").onclick=function(){send({t:"select_game",id:""});};
+$("nextBtn").onclick=function(){send({t:"next"});};
+$("resetBtn").onclick=function(){send({t:"reset"});};
 for(var i=0;i<4;i++){(function(i){
-  document.getElementById("b"+i).onclick=function(){
-    if(answered)return;answered=true;myChoice=i;
-    ws.send(JSON.stringify({type:"answer",choice:i}));
+  $("b"+i).onclick=function(){
+    if(lastAnswerChoice>=0)return;
+    lastAnswerChoice=i;
+    send({t:"answer",choice:i});
+    for(var j=0;j<4;j++)$("b"+j).disabled=true;
+    $("qStatus").textContent="Reponse envoyee, attends les autres...";
   };
 })(i);}
 
-connect();show("join");
+connect();show("s-join");
 </script></body></html>)HTML";
 
 // ---------------------------------------------------------------------------
-// Embedded admin control panel (served behind HTTP Basic Auth)
+// Admin control panel (HTTP Basic Auth)
 // ---------------------------------------------------------------------------
 static const char ADMIN_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Quiz - Admin</title>
+<title>GamesHub - Admin</title>
 <style>
   *{box-sizing:border-box;font-family:system-ui,sans-serif}
   body{background:#0f1020;color:#fff;margin:0;padding:20px;text-align:center}
@@ -238,205 +341,115 @@ static const char ADMIN_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
   .next{background:#26890c}.reset{background:#e6394a}
   a{color:#9aa}
 </style></head><body>
-<h1>Quiz &mdash; Maitre du jeu</h1>
+<h1>GamesHub &mdash; Admin</h1>
 <div class="card">
-  <div class="row"><span>Etat</span><b id="state">...</b></div>
+  <div class="row"><span>Jeu</span><b id="game">-</b></div>
+  <div class="row"><span>Phase</span><b id="phase">...</b></div>
   <div class="row"><span>Joueurs</span><b id="players">0</b></div>
-  <div class="row"><span>Question</span><b id="q">-</b></div>
+  <div class="row"><span>Hote</span><b id="host">-</b></div>
+  <div class="row"><span>Progression</span><b id="progress">-</b></div>
 </div>
-<button class="next" onclick="act('next')">Demarrer / Question suivante</button>
-<button class="reset" onclick="act('reset')">Recommencer (Reset)</button>
+<button class="next" onclick="act('next')">Demarrer / Suivant</button>
+<button class="reset" onclick="act('reset')">Reset</button>
 <p><a href="/">Retour a la page joueur</a></p>
 <script>
 function act(a){fetch('/admin/'+a).then(refresh);}
 function refresh(){fetch('/admin/state').then(function(r){return r.json();}).then(function(s){
-  document.getElementById('state').textContent=s.state;
+  document.getElementById('game').textContent=s.game||'-';
+  document.getElementById('phase').textContent=s.phase;
   document.getElementById('players').textContent=s.players;
-  document.getElementById('q').textContent=s.qt?(s.qi+'/'+s.qt):'-';
+  document.getElementById('host').textContent=s.host||'-';
+  document.getElementById('progress').textContent=s.progress||'-';
 }).catch(function(){});}
 setInterval(refresh,1500);refresh();
 </script></body></html>)HTML";
 
 // ---------------------------------------------------------------------------
-// Quiz-specific helpers (still here pending C5 extraction into a game module)
+// Unified state push (the single choke point: WS broadcast + Flipper update).
+// Called by the core after every game hook and after tick() returns true.
 // ---------------------------------------------------------------------------
-static bool allAnswered() {
-    for (int i = 0; i < MAX_PLAYERS; i++)
-        if (players[i].active && players[i].name[0] && !players[i].answered) return false;
-    return activeCount() > 0;
-}
-
-static const char* stateName() {
-    switch (gameState) {
-        case LOBBY:    return "lobby";
-        case QUESTION: return "question";
-        case REVEAL:   return "reveal";
-        case FINISHED: return "finished";
-    }
-    return "?";
-}
-
-// ---------------------------------------------------------------------------
-// Outgoing messages
-// ---------------------------------------------------------------------------
-static void fillSortedScores(JsonArray arr) {
-    int idx[MAX_PLAYERS], n = 0;
-    for (int i = 0; i < MAX_PLAYERS; i++)
-        if (players[i].active && players[i].name[0]) idx[n++] = i;
-    for (int i = 0; i < n - 1; i++)
-        for (int j = i + 1; j < n; j++)
-            if (players[idx[j]].score > players[idx[i]].score) {
-                int t = idx[i]; idx[i] = idx[j]; idx[j] = t;
-            }
-    for (int i = 0; i < n; i++) {
-        JsonObject o = arr.add<JsonObject>();
-        o["name"]  = players[idx[i]].name;
-        o["score"] = players[idx[i]].score;
-    }
-}
-
-static void sendToFlipper();
-
-static void broadcastLobby() {
+static void broadcastState() {
     JsonDocument doc;
-    doc["type"]    = "lobby";
-    doc["players"] = activeCount();
-    doc["hostId"]  = host_id;
+    doc["t"]      = "state";
+    GamePhase ph  = current_game ? current_game->phase() : GAME_PHASE_LOBBY;
+    doc["phase"]  = phase_str(ph);
+    if (current_game) doc["game"] = current_game->id;
+    else              doc["game"] = (const char*)nullptr;
+    doc["hostId"] = host_id;
+
+    JsonArray pa = doc["players"].to<JsonArray>();
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!players[i].name[0]) continue;  // never assigned
+        JsonObject po = pa.add<JsonObject>();
+        po["id"]        = players[i].clientId;
+        po["name"]      = players[i].name;
+        po["score"]     = players[i].score;
+        po["connected"] = players[i].active;
+        po["host"]      = host_is(players[i].clientId);
+    }
+
+    JsonObject round = doc["round"].to<JsonObject>();
+    if (current_game && current_game->serialize_round) current_game->serialize_round(round);
+
     String out; serializeJson(doc, out);
     ws.textAll(out);
-}
 
-static String questionJson() {
-    const Question& q = QUESTIONS[currentQuestion];
-    JsonDocument doc;
-    doc["type"]  = "question";
-    doc["index"] = currentQuestion;
-    doc["total"] = QUESTION_COUNT;
-    doc["q"]     = q.text;
-    doc["time"]  = (int)(QUESTION_TIME_MS / 1000);
-    JsonArray opts = doc["options"].to<JsonArray>();
-    for (int i = 0; i < 4; i++) opts.add(q.options[i]);
-    String out; serializeJson(doc, out);
-    return out;
-}
-
-static void broadcastQuestion() {
-    ws.textAll(questionJson());
-}
-
-static void broadcastReveal() {
-    JsonDocument doc;
-    doc["type"]    = "reveal";
-    doc["correct"] = QUESTIONS[currentQuestion].correct;
-    fillSortedScores(doc["scores"].to<JsonArray>());
-    String out; serializeJson(doc, out);
-    ws.textAll(out);
-}
-
-static void broadcastFinished() {
-    JsonDocument doc;
-    doc["type"] = "finished";
-    fillSortedScores(doc["scores"].to<JsonArray>());
-    String out; serializeJson(doc, out);
-    ws.textAll(out);
-}
-
-// ---------------------------------------------------------------------------
-// Game flow (all called with gameMutex already held)
-// ---------------------------------------------------------------------------
-static void startQuestion(int idx) {
-    currentQuestion = idx;
-    gameState       = QUESTION;
-    questionStartMs = millis();
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        players[i].answered = false;
-        players[i].answer   = 0xFF;
-    }
-    broadcastQuestion();
     sendToFlipper();
 }
 
-static void reveal() {
-    if (gameState != QUESTION) return;  // idempotent: timeout vs all-answered can both fire
-    uint8_t correct = QUESTIONS[currentQuestion].correct;
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        Player& p = players[i];
-        if (p.active && p.name[0] && p.answered && p.answer == correct) {
-            float frac = 1.0f - (float)p.answerMs / (float)QUESTION_TIME_MS;
-            if (frac < 0) frac = 0;
-            p.score += 500 + (uint32_t)(500.0f * frac);
-        }
-    }
-    gameState = REVEAL;
-    broadcastReveal();
-    sendToFlipper();
-}
-
-static void finish() {
-    gameState = FINISHED;
-    broadcastFinished();
-    sendToFlipper();
-}
-
-static void resetGame() {
-    gameState       = LOBBY;
-    currentQuestion = -1;
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        players[i].score    = 0;
-        players[i].answered = false;
-    }
-    broadcastLobby();
-    sendToFlipper();
-}
-
-static void advance() {
-    if (gameState == LOBBY) {
-        if (QUESTION_COUNT > 0) startQuestion(0);
-    } else if (gameState == QUESTION) {
-        reveal();
-    } else if (gameState == REVEAL) {
-        if (currentQuestion + 1 < QUESTION_COUNT) startQuestion(currentQuestion + 1);
-        else finish();
-    } else { // FINISHED
-        resetGame();
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Flipper UART (newline-delimited line protocol)
-// Transport is in core/flipper_uart.{h,cpp}; the bindings below are the
-// quiz-app-specific semantics on top of it. They will move into the quiz
-// game module in C5.
-// ---------------------------------------------------------------------------
 static void sendToFlipper() {
     flipper_uart_printf("PLAYERS:%d\n", activeCount());
-    flipper_uart_printf("STATE:%s\n", stateName());
+    GamePhase ph = current_game ? current_game->phase() : GAME_PHASE_LOBBY;
+    flipper_uart_printf("STATE:%s\n", phase_str(ph));
     Player* h = host_get();
     flipper_uart_printf("HOST:%s\n", h ? h->name : "");
-    if (gameState == QUESTION || gameState == REVEAL)
-        flipper_uart_printf("Q:%d/%d\n", currentQuestion + 1, QUESTION_COUNT);
+    flipper_uart_printf("GAME:%s\n", current_game ? current_game->id : "");
+    char prog[32]; prog[0] = '\0';
+    if (current_game && current_game->flipper_progress) current_game->flipper_progress(prog, sizeof(prog));
+    flipper_uart_printf("PROGRESS:%s\n", prog);
 }
 
+// ---------------------------------------------------------------------------
+// Flipper UART command handler — buttons act as host actions (gamemaster).
+// ---------------------------------------------------------------------------
 static void onFlipperCommand(const char* cmd) {
     GAME_LOCK();
-    if (strcmp(cmd, "NEXT") == 0 || strcmp(cmd, "START") == 0) advance();
-    else if (strcmp(cmd, "RESET") == 0)                        resetGame();
+    if (!current_game) {
+        // No game selected yet: NEXT auto-picks the first registered game so
+        // the Flipper alone (no host yet) can still kick things off.
+        if (strcmp(cmd, "NEXT") == 0 || strcmp(cmd, "START") == 0) {
+            if (GAMES_COUNT > 0) {
+                game_select(GAMES[0]);
+                current_game->on_advance();
+                broadcastState();
+            }
+        }
+    } else {
+        if (strcmp(cmd, "NEXT") == 0 || strcmp(cmd, "START") == 0) {
+            current_game->on_advance();
+            broadcastState();
+        } else if (strcmp(cmd, "RESET") == 0) {
+            current_game->on_reset();
+            broadcastState();
+        }
+    }
     GAME_UNLOCK();
 }
 
 // ---------------------------------------------------------------------------
-// WebSocket handling
+// WebSocket message dispatch
 // ---------------------------------------------------------------------------
 static void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t len) {
     JsonDocument doc;
     if (deserializeJson(doc, data, len)) return;
-    const char* type = doc["type"];
-    if (!type) return;
+    const char* t = doc["t"] | (const char*)nullptr;
+    if (!t) return;
 
     GAME_LOCK();
-    if (strcmp(type, "join") == 0) {
+
+    if (strcmp(t, "join") == 0) {
         const char* name = doc["name"] | "Joueur";
-        Player* p = findReconnectSlot(name);   // reconnect: reclaim slot + keep score
+        Player* p = findReconnectSlot(name);
         if (!p) p = findPlayer(client->id());
         if (!p) p = addPlayer(client->id());
         if (p) {
@@ -444,44 +457,58 @@ static void handleMessage(AsyncWebSocketClient* client, uint8_t* data, size_t le
             p->clientId = client->id();
             strncpy(p->name, name, MAX_NAME_LEN);
             p->name[MAX_NAME_LEN] = '\0';
-
             host_recompute();
-
-            JsonDocument ack; ack["type"] = "joined";
-            ack["host"] = host_is(client->id());
-            String out; serializeJson(ack, out);
-            client->text(out);
-
-            broadcastLobby();
-            sendToFlipper();
-            if (gameState == QUESTION) client->text(questionJson());  // late joiner: live question
+            if (current_game && current_game->on_player_join) current_game->on_player_join(p);
+            broadcastState();
         }
-    } else if (strcmp(type, "answer") == 0) {
+    } else if (strcmp(t, "select_game") == 0) {
+        // H6: only the host may pick the game.
+        if (host_is(client->id())) {
+            const char* id = doc["id"] | "";
+            if (id[0] == '\0') {
+                current_game = nullptr;  // back to hub
+            } else {
+                const Game* g = game_find_by_id(id);
+                if (g) game_select(g);
+            }
+            broadcastState();
+        }
+    } else if (strcmp(t, "next") == 0 || strcmp(t, "start") == 0) {
+        if (host_is(client->id()) && current_game) {
+            current_game->on_advance();
+            broadcastState();
+        }
+    } else if (strcmp(t, "reset") == 0) {
+        if (host_is(client->id()) && current_game) {
+            current_game->on_reset();
+            broadcastState();
+        }
+    } else if (current_game && current_game->on_message) {
         Player* p = findPlayer(client->id());
-        int choice = doc["choice"] | -1;
-        if (gameState == QUESTION && p && !p->answered && choice >= 0 && choice <= 3) {
-            p->answered = true;
-            p->answer   = (uint8_t)choice;
-            p->answerMs = millis() - questionStartMs;
-
-            JsonDocument ack; ack["type"] = "ack";
-            String out; serializeJson(ack, out);
-            client->text(out);
-
-            if (allAnswered()) reveal();
+        if (p) {
+            current_game->on_message(p, doc);
+            broadcastState();
         }
     }
+
     GAME_UNLOCK();
 }
 
 static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client,
                       AwsEventType type, void* arg, uint8_t* data, size_t len) {
-    if (type == WS_EVT_DISCONNECT) {
+    if (type == WS_EVT_CONNECT) {
+        // Push current state to the freshly connected client so it can render
+        // immediately (it may then send a {t:"join"} for reconnect).
         GAME_LOCK();
+        broadcastState();
+        GAME_UNLOCK();
+    } else if (type == WS_EVT_DISCONNECT) {
+        GAME_LOCK();
+        Player* p = findPlayer(client->id());
         removePlayer(client->id());
         host_recompute();
-        broadcastLobby();
-        sendToFlipper();
+        if (current_game && current_game->on_player_leave && p) current_game->on_player_leave(p);
+        broadcastState();
         GAME_UNLOCK();
     } else if (type == WS_EVT_DATA) {
         AwsFrameInfo* info = (AwsFrameInfo*)arg;
@@ -491,7 +518,7 @@ static void onWsEvent(AsyncWebSocket*, AsyncWebSocketClient* client,
 }
 
 // ---------------------------------------------------------------------------
-// HTTP / captive portal
+// HTTP routes
 // ---------------------------------------------------------------------------
 static bool adminAuth(AsyncWebServerRequest* req) {
     if (!req->authenticate(ADMIN_USER, ADMIN_PASS)) {
@@ -509,8 +536,6 @@ static void setupServer() {
         req->send(200, "text/html", INDEX_HTML);
     });
 
-    // Admin control panel (password-protected via HTTP Basic Auth), reachable
-    // from the "Admin" link on the player page. Works without the Flipper.
     server.on("/admin", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!adminAuth(req)) return;
         req->send(200, "text/html", ADMIN_HTML);
@@ -518,47 +543,60 @@ static void setupServer() {
     server.on("/admin/state", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!adminAuth(req)) return;
         GAME_LOCK();
-        const char* st = stateName();
-        int  pc  = activeCount();
-        bool inq = (gameState == QUESTION || gameState == REVEAL);
-        int  qi  = currentQuestion + 1;
+        GamePhase ph = current_game ? current_game->phase() : GAME_PHASE_LOBBY;
+        const char* phStr = phase_str(ph);
+        const char* gameId = current_game ? current_game->id : "";
+        int pc = activeCount();
+        Player* h = host_get();
+        char progress[32]; progress[0] = '\0';
+        if (current_game && current_game->flipper_progress) current_game->flipper_progress(progress, sizeof(progress));
         GAME_UNLOCK();
         JsonDocument doc;
-        doc["state"]   = st;
+        doc["phase"]   = phStr;
+        doc["game"]    = gameId;
         doc["players"] = pc;
-        if (inq) { doc["qi"] = qi; doc["qt"] = QUESTION_COUNT; }
+        doc["host"]    = h ? h->name : "";
+        doc["progress"] = progress;
         String out; serializeJson(doc, out);
         req->send(200, "application/json", out);
     });
-    server.on("/admin/start", HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
-    server.on("/admin/next",  HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); advance();   GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
-    server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) { if (!adminAuth(req)) return; GAME_LOCK(); resetGame(); GAME_UNLOCK(); req->send(200, "text/plain", "ok"); });
+    auto admin_advance = [](AsyncWebServerRequest* req) {
+        if (!adminAuth(req)) return;
+        GAME_LOCK();
+        if (!current_game && GAMES_COUNT > 0) game_select(GAMES[0]);
+        if (current_game) current_game->on_advance();
+        broadcastState();
+        GAME_UNLOCK();
+        req->send(200, "text/plain", "ok");
+    };
+    server.on("/admin/start", HTTP_GET, admin_advance);
+    server.on("/admin/next",  HTTP_GET, admin_advance);
+    server.on("/admin/reset", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!adminAuth(req)) return;
+        GAME_LOCK();
+        if (current_game) current_game->on_reset();
+        broadcastState();
+        GAME_UNLOCK();
+        req->send(200, "text/plain", "ok");
+    });
 
-    // Connectivity-probe handling: depending on CAPTIVE_PORTAL_ENABLED above,
-    // we either force the captive-portal popup (aggressive) or answer probes
-    // as if internet worked (stealth — no "no internet" warning, no auto-
-    // disconnect on Android, but no auto-popup either).
+    // Captive-portal probe handling (see CAPTIVE_PORTAL_ENABLED comment above).
     server.onNotFound([](AsyncWebServerRequest* req) {
 #if CAPTIVE_PORTAL_ENABLED
         req->redirect("http://192.168.4.1/");
 #else
         String url = req->url();
-        // Android (Chrome / system): expects HTTP 204 No Content.
         if (url.endsWith("/generate_204") || url == "/gen_204") {
             req->send(204);
-        // Windows: expects "Microsoft NCSI" or "Microsoft Connect Test".
         } else if (url.indexOf("ncsi.txt") >= 0) {
             req->send(200, "text/plain", "Microsoft NCSI");
         } else if (url.indexOf("connecttest.txt") >= 0) {
             req->send(200, "text/plain", "Microsoft Connect Test");
-        // iOS / macOS: expects an HTML page containing the word "Success".
         } else if (url.indexOf("hotspot-detect") >= 0 || url.indexOf("success.html") >= 0
                 || url.indexOf("library/test") >= 0) {
             req->send(200, "text/html",
                 "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");
         } else {
-            // Any other unknown URL — still serve the game page so a user typing
-            // anything in the address bar lands on the quiz.
             req->send(200, "text/html", INDEX_HTML);
         }
 #endif
@@ -576,8 +614,9 @@ void setup() {
     flipper_uart_set_command_handler(onFlipperCommand);
 
     wifi_portal_begin(AP_SSID, AP_PASS);
-
     setupServer();
+
+    Serial.printf("[GamesHub] %d game(s) registered\n", GAMES_COUNT);
 }
 
 void loop() {
@@ -586,7 +625,8 @@ void loop() {
     flipper_uart_poll();
 
     GAME_LOCK();
-    if (gameState == QUESTION && millis() - questionStartMs > QUESTION_TIME_MS)
-        reveal();
+    if (current_game && current_game->tick) {
+        if (current_game->tick(millis())) broadcastState();
+    }
     GAME_UNLOCK();
 }
