@@ -16,6 +16,7 @@
 #include <ArduinoJson.h>
 
 #include "core/players.h"
+#include "core/flipper_uart.h"
 
 // ---------------------------------------------------------------------------
 // User-configurable settings — edit these to your taste, then re-flash.
@@ -44,12 +45,7 @@ static const IPAddress AP_GATEWAY(192, 168, 4, 1);
 static const IPAddress AP_SUBNET(255, 255, 255, 0);
 static const byte DNS_PORT = 53;
 
-// UART link to the Flipper Zero. On the official Wi-Fi Dev Board the Flipper's
-// USART (pin 13 TX / pin 14 RX) is wired to the ESP32-S2 UART0 pins; we route
-// FlipperSerial (UART1) onto them via the GPIO matrix.
-#define FLIPPER_UART_RX_PIN 44  // <- Flipper pin 13 (TX)
-#define FLIPPER_UART_TX_PIN 43  // -> Flipper pin 14 (RX)
-#define FLIPPER_UART_BAUD   115200
+// Flipper UART pinout + low-level transport live in core/flipper_uart.{h,cpp}.
 
 #define QUESTION_TIME_MS   20000UL
 #define AP_MAX_CONN        8    // ESP32 SoftAP practical limit (~8 phones)
@@ -90,7 +86,6 @@ static uint32_t  questionStartMs  = 0;
 DNSServer       dnsServer;
 AsyncWebServer  server(80);
 AsyncWebSocket  ws("/ws");
-HardwareSerial  FlipperSerial(1);
 
 // Serializes every access to the game state, which is touched both by the loop
 // task (UART / question timeout) and by the AsyncTCP task (WebSocket and HTTP
@@ -415,34 +410,22 @@ static void advance() {
 
 // ---------------------------------------------------------------------------
 // Flipper UART (newline-delimited line protocol)
+// Transport is in core/flipper_uart.{h,cpp}; the bindings below are the
+// quiz-app-specific semantics on top of it. They will move into the quiz
+// game module in C5.
 // ---------------------------------------------------------------------------
 static void sendToFlipper() {
-    FlipperSerial.printf("PLAYERS:%d\n", activeCount());
-    FlipperSerial.printf("STATE:%s\n", stateName());
+    flipper_uart_printf("PLAYERS:%d\n", activeCount());
+    flipper_uart_printf("STATE:%s\n", stateName());
     if (gameState == QUESTION || gameState == REVEAL)
-        FlipperSerial.printf("Q:%d/%d\n", currentQuestion + 1, QUESTION_COUNT);
+        flipper_uart_printf("Q:%d/%d\n", currentQuestion + 1, QUESTION_COUNT);
 }
 
-static void handleFlipperCommand(const String& cmd) {
+static void onFlipperCommand(const char* cmd) {
     GAME_LOCK();
-    if (cmd == "NEXT" || cmd == "START") advance();
-    else if (cmd == "RESET")             resetGame();
+    if (strcmp(cmd, "NEXT") == 0 || strcmp(cmd, "START") == 0) advance();
+    else if (strcmp(cmd, "RESET") == 0)                        resetGame();
     GAME_UNLOCK();
-}
-
-static void pollFlipper() {
-    static String line;
-    while (FlipperSerial.available()) {
-        char c = (char)FlipperSerial.read();
-        if (c == '\n' || c == '\r') {
-            line.trim();
-            if (line.length()) handleFlipperCommand(line);
-            line = "";
-        } else {
-            line += c;
-            if (line.length() > 32) line = "";
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -588,7 +571,9 @@ static void setupServer() {
 void setup() {
     Serial.begin(115200);
     gameMutex = xSemaphoreCreateMutex();
-    FlipperSerial.begin(FLIPPER_UART_BAUD, SERIAL_8N1, FLIPPER_UART_RX_PIN, FLIPPER_UART_TX_PIN);
+
+    flipper_uart_begin();
+    flipper_uart_set_command_handler(onFlipperCommand);
 
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET);
@@ -605,7 +590,7 @@ void setup() {
 void loop() {
     dnsServer.processNextRequest();
     ws.cleanupClients();
-    pollFlipper();
+    flipper_uart_poll();
 
     GAME_LOCK();
     if (gameState == QUESTION && millis() - questionStartMs > QUESTION_TIME_MS)
